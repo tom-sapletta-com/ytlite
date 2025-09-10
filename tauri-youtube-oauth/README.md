@@ -57,7 +57,7 @@ npm install
 2. Utwórz nowy projekt lub wybierz istniejący
 3. Włącz **YouTube Data API v3**
 4. Idź do **Credentials** → **Create Credentials** → **OAuth 2.0 Client ID**
-5. **Application type**: Desktop application
+5. **Application type**: Web application
 6. **Authorized redirect URIs**: `http://127.0.0.1:14321/callback`
 
 ### 3. Uruchomienie
@@ -89,7 +89,7 @@ const config = {
 3. Użytkownik loguje się i daje uprawnienia
 4. Google przekierowuje na localhost:14321/callback?code=...
 5. Tauri app przechwytuje code i wymienia na tokeny
-6. Tokeny zapisywane lokalnie w ~/.ytlite/tokens.json
+6. Tokeny zapisywane lokalnie w katalogu konfiguracyjnym aplikacji Tauri (patrz sekcja poniżej)
 ```
 
 ### 3. Integracja z YTLite
@@ -136,23 +136,24 @@ const env = await invoke('generate_env')
 
 ## 📂 Pliki konfiguracyjne
 
-### `~/.ytlite/config.json`
+### Lokalizacja plików konfiguracyjnych (Tauri app config dir)
+
+Pliki są zapisywane w katalogu konfiguracyjnym aplikacji Tauri o identyfikatorze `com.ytlite.oauth`:
+
+- Linux: `~/.config/com.ytlite.oauth/`
+- macOS: `~/Library/Application Support/com.ytlite.oauth/`
+- Windows: `%APPDATA%\com.ytlite.oauth\`
+
+Pliki:
+
+- `oauth_config.json`
 ```json
-{
-  "client_id": "xxx.googleusercontent.com",
-  "client_secret": "xxx",
-  "redirect_uri": "http://127.0.0.1:1420/callback"
-}
+{ "client_id": "xxx.googleusercontent.com", "client_secret": "xxx" }
 ```
 
-### `~/.ytlite/tokens.json`
+- `tokens.json`
 ```json
-{
-  "access_token": "ya29.xxx",
-  "refresh_token": "1//xxx", 
-  "expires_in": 3600,
-  "created_at": 1640995200
-}
+{ "access_token": "ya29.xxx", "refresh_token": "1//xxx", "expires_in": 3600, "created_at": 1640995200 }
 ```
 
 ## 🔐 Bezpieczeństwo

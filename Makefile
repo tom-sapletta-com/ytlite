@@ -36,7 +36,7 @@ shorts: ## Create YouTube Shorts from existing videos
 
 upload: ## Upload videos to YouTube
 	@echo "$(YELLOW)📤 Uploading to YouTube...$(NC)"
-	python3 src/youtube_uploader.py --batch output/
+	python3 src/youtube_uploader.py upload --batch --folder output/
 	@echo "$(GREEN)✅ Upload complete$(NC)"
 
 publish: generate shorts ## Full pipeline: generate + shorts + upload (no upload by default)
@@ -86,6 +86,21 @@ docker-dev: ## Run development environment with live reload
 docker-shell: ## Open shell in Docker container
 	@echo "$(YELLOW)🐳 Opening Docker shell...$(NC)"
 	docker run -it --rm -v $(PWD):/app ytlite:app bash
+
+# Tauri OAuth App helpers
+oauth-install: ## Install Node deps for Tauri OAuth app
+	@echo "$(YELLOW)📦 Installing Tauri OAuth app dependencies...$(NC)"
+	npm --prefix tauri-youtube-oauth install
+	@echo "$(GREEN)✅ Tauri OAuth deps installed$(NC)"
+
+oauth-dev: ## Run Tauri OAuth app in dev mode (requires Rust toolchain)
+	@echo "$(YELLOW)🖥️  Starting Tauri OAuth app...$(NC)"
+	npm --prefix tauri-youtube-oauth run dev
+
+oauth-build: ## Build Tauri OAuth app (desktop binary)
+	@echo "$(YELLOW)🏗️  Building Tauri OAuth app...$(NC)"
+	npm --prefix tauri-youtube-oauth run build
+	@echo "$(GREEN)✅ Tauri OAuth app built$(NC)"
 
 docker-tts: ## Run TTS service for audio generation
 	@echo "$(YELLOW)🔊 Starting TTS service...$(NC)"
