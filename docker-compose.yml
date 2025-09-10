@@ -1,8 +1,13 @@
 services:
-  tauri-dev:
+  tauri-base:
     build:
       context: ./tauri-youtube-oauth
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.base
+    image: ytlite:tauri-base
+    profiles: ["tauri-build"]
+
+  tauri-dev:
+    image: ytlite:tauri-base
     volumes:
       - ./tauri-youtube-oauth:/app
       - /tmp/.X11-unix:/tmp/.X11-unix # Mount X11 socket for GUI apps

@@ -12,11 +12,11 @@ anyhow = "1.0"
 reqwest = { version = "0.11", features = ["json", "rustls-tls"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-tauri = { version = "1.6.3", features = [] }
+tauri = { version = "1.5.0", features = [] }
 tokio = { version = "1", features = ["macros", "rt-multi-thread", "time"] }
 url = "2"
 urlencoding = "2"
 warp = "0.3"
 
 [build-dependencies]
-tauri-build = { version = "1.6.3" }
+tauri-build = { version = "1.5.0" }
