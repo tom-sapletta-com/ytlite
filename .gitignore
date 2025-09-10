@@ -208,3 +208,50 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+# Pliki i katalogi Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+env.bak/
+venv.bak/
+
+# Pliki i katalogi projektu YTLite
+output/
+logs/
+credentials/
+.env
+
+# Pliki tymczasowe
+*.swp
+*.swo
+*~
+
+# Katalogi i pliki Docker
+.docker/
+Dockerfile.*
+
+# Pliki systemowe
+.DS_Store
+Thumbs.db
+
+# Pliki IDE
+.idea/
+.vscode/
+*.code-workspace
+
+# Pliki wirtualnych środowisk
+venv/
+env/
+
+# Pliki binarne i zależności
+node_modules/
+
+# Pliki konfiguracyjne Tauri
+/tauri-youtube-oauth/node_modules/
+/tauri-youtube-oauth/dist/
+/tauri-youtube-oauth/target/
