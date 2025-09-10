@@ -10,7 +10,6 @@ NC="\033[0m" # No Color
 
 echo "${YELLOW}🎬 Generating videos...${NC}"
 
-# The main script handles dependency checks internally
-python3 src/ytlite_main.py batch content/episodes/
+python3 -u src/ytlite_main.py batch content/episodes/
 
 echo "${GREEN}✅ Videos generated${NC}"

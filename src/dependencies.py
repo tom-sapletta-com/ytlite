@@ -28,6 +28,19 @@ def check_and_install_package(package_name, import_name=None):
             console.print(f"[red]✗ Failed to install {package_name}[/]")
             return False
 
+def check_ffmpeg():
+    """Check if ffmpeg is installed and available in PATH"""
+    console.print("[cyan]Checking for ffmpeg...[/]")
+    try:
+        subprocess.check_output(["ffmpeg", "-version"], stderr=subprocess.STDOUT)
+        console.print("[green]✓ ffmpeg is installed.[/]")
+        return True
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        console.print("[bold red]✗ ffmpeg not found. Please install ffmpeg and ensure it is in your PATH.[/]")
+        console.print("  On Debian/Ubuntu: sudo apt-get install ffmpeg")
+        console.print("  On macOS (Homebrew): brew install ffmpeg")
+        return False
+
 def verify_dependencies():
     """Verify all required dependencies are installed"""
     required_packages = [
@@ -48,6 +61,9 @@ def verify_dependencies():
         if not check_and_install_package(package, import_name):
             all_ok = False
     
+    if not check_ffmpeg():
+        all_ok = False
+
     if all_ok:
         console.print("[green]✓ All dependencies verified[/]")
     else:

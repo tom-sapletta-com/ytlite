@@ -62,45 +62,58 @@ class YTLite:
     
     def generate_video(self, markdown_path: str):
         """Generate video from markdown file"""
-        console.print(f"[bold cyan]Processing: {markdown_path}[/]")
-        
-        # Parse content
-        metadata, paragraphs = self.content_parser.parse_markdown(markdown_path)
-        
-        # Prepare output paths
-        base_name = Path(markdown_path).stem
-        audio_path = self.output_dir / "audio" / f"{base_name}.wav"
-        video_path = self.output_dir / "videos" / f"{base_name}.mp4"
-        
-        # Generate audio
-        combined_text = self.audio_generator.combine_text_for_audio(paragraphs)
-        self.audio_generator.generate_audio(combined_text, str(audio_path))
-        
-        # Create slides
-        slides_text = self.content_parser.prepare_content_for_video(paragraphs)
-        slide_paths = []
-        for i, text in enumerate(slides_text):
-            slide_path = self.video_generator.create_slide(
-                text, 
-                theme=metadata.get('theme', 'tech')
+        console.print(f"[bold cyan]Processing: {markdown_path}[/bold cyan]")
+        try:
+            console.print("Step 1: Parsing content...")
+            metadata, paragraphs = self.content_parser.parse_markdown(markdown_path)
+            console.print("Step 1: Done.")
+
+            console.print("Step 2: Preparing output paths...")
+            base_name = Path(markdown_path).stem
+            audio_path = self.output_dir / "audio" / f"{base_name}.wav"
+            video_path = self.output_dir / "videos" / f"{base_name}.mp4"
+            console.print(f"Audio path: {audio_path}")
+            console.print(f"Video path: {video_path}")
+            console.print("Step 2: Done.")
+
+            console.print("Step 3: Generating audio...")
+            combined_text = self.audio_generator.combine_text_for_audio(paragraphs)
+            self.audio_generator.generate_audio(combined_text, str(audio_path))
+            console.print("Step 3: Done.")
+
+            console.print("Step 4: Creating slides...")
+            slides_text = self.content_parser.prepare_content_for_video(paragraphs)
+            slide_paths = []
+            for i, text in enumerate(slides_text):
+                slide_path = self.video_generator.create_slide(
+                    text, 
+                    theme=metadata.get('theme', 'tech')
+                )
+                slide_paths.append(slide_path)
+            console.print(f"Step 4: Done. Created {len(slide_paths)} slides.")
+
+            console.print("Step 5: Creating video...")
+            self.video_generator.create_video_from_slides(
+                slide_paths, 
+                str(audio_path), 
+                str(video_path)
             )
-            slide_paths.append(slide_path)
-        
-        # Create video
-        self.video_generator.create_video_from_slides(
-            slide_paths, 
-            str(audio_path), 
-            str(video_path)
-        )
-        
-        console.print(f"[green]✓ Video generated: {video_path}[/]")
-        
-        # Generate shorts if enabled
-        if self.config.get("generate_shorts", True):
-            shorts_path = self.output_dir / "shorts" / f"{base_name}_short.mp4"
-            self.video_generator.create_shorts(str(video_path), str(shorts_path))
-        
-        return str(video_path)
+            console.print("Step 5: Done.")
+            
+            console.print(f"[green]✓ Video generated: {video_path}[/green]")
+            
+            if self.config.get("generate_shorts", True):
+                console.print("Step 6: Generating shorts...")
+                shorts_path = self.output_dir / "shorts" / f"{base_name}_short.mp4"
+                self.video_generator.create_shorts(str(video_path), str(shorts_path))
+                console.print("Step 6: Done.")
+            
+            return str(video_path)
+        except Exception as e:
+            console.print(f"[bold red]Error in generate_video for {markdown_path}: {e}[/bold red]")
+            import traceback
+            traceback.print_exc()
+            raise
 
 @click.group()
 def cli():
@@ -151,4 +164,10 @@ def batch(directory):
         sys.exit(1)
 
 if __name__ == "__main__":
-    cli()
+    try:
+        cli()
+    except Exception as e:
+        console.print(f"[bold red]An unexpected error occurred: {e}[/bold red]")
+        import traceback
+        traceback.print_exc()
+        sys.exit(1)

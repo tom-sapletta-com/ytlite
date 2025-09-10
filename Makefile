@@ -20,7 +20,7 @@ check-deps: ## Check and install missing dependencies
 	@bash scripts/check-deps.sh
 
 generate: ## Generate videos from markdown content
-	@bash scripts/generate.sh
+	bash scripts/generate.sh
 
 shorts: ## Create YouTube Shorts from existing videos
 	@bash scripts/shorts.sh
