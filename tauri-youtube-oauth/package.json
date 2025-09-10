@@ -13,7 +13,10 @@
     "test:e2e": "playwright test",
     "test:unit": "vitest --run",
     "test:watch": "vitest",
-    "test:ci": "npm run -s test:unit && (cd src-tauri && cargo test)"
+    "test:ci": "npm run -s test:unit && (cd src-tauri && cargo test)",
+    "e2e:install": "playwright install",
+    "e2e": "playwright test",
+    "e2e:headed": "playwright test --headed"
   },
   "dependencies": {
     "@tauri-apps/api": "^1.5.3",
@@ -28,6 +31,7 @@
     "@testing-library/jest-dom": "^6.4.2",
     "@testing-library/react": "^14.1.2",
     "jsdom": "^24.0.0",
+    "@playwright/test": "^1.45.0",
     "vitest": "^1.6.0",
     "typescript": "^5.3.3",
     "vite": "^5.1.0"

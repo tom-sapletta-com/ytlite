@@ -4,7 +4,8 @@ import { test, expect, _electron as electron } from '@playwright/test';
 // It requires the app to be built first.
 test('launch app and check title', async () => {
   // Launch the app
-  const electronApp = await electron.launch({ args: ['./src-tauri/target/release/ytlite-oauth'] });
+    const appPath = './src-tauri/target/debug/ytlite-oauth';
+  const electronApp = await electron.launch({ args: [appPath] });
 
   // Get the first window
   const window = await electronApp.firstWindow();
