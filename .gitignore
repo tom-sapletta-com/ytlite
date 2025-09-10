@@ -209,6 +209,11 @@ marimo/_static/
 marimo/_lsp/
 __marimo__/
 
+# Tauri OAuth App artifacts
+tauri-youtube-oauth/node_modules/
+tauri-youtube-oauth/dist/
+tauri-youtube-oauth/src-tauri/target/
+
 # Pliki i katalogi Python
 __pycache__/
 *.py[cod]
