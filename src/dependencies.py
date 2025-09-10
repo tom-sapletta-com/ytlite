@@ -55,3 +55,6 @@ def verify_dependencies():
         sys.exit(1)
     
     return all_ok
+
+if __name__ == "__main__":
+    verify_dependencies()

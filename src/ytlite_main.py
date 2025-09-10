@@ -135,12 +135,20 @@ def batch(directory):
     
     console.print(f"[cyan]Found {len(md_files)} markdown files[/]")
     
+    failures = 0
     for md_file in md_files:
         try:
             ytlite.generate_video(str(md_file))
         except Exception as e:
-            console.print(f"[red]Error processing {md_file}: {e}[/]")
+            console.print(f"[bold red]Error processing {md_file}: {e}[/bold red]")
+            import traceback
+            traceback.print_exc()
+            failures += 1
             continue
+    
+    if failures > 0:
+        console.print(f"[bold red]❌ Finished with {failures} errors.[/bold red]")
+        sys.exit(1)
 
 if __name__ == "__main__":
     cli()
