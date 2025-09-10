@@ -1,0 +1,32 @@
+{
+  "package": {
+    "productName": "Tauri YouTube OAuth",
+    "version": "0.1.0"
+  },
+  "build": {
+    "beforeDevCommand": "vite --port 1420",
+    "devPath": "http://127.0.0.1:1420",
+    "beforeBuildCommand": "vite build",
+    "distDir": "dist"
+  },
+  "tauri": {
+    "bundle": {
+      "identifier": "com.ytlite.oauth",
+      "targets": ["deb", "appimage", "msi", "dmg"]
+    },
+    "windows": [
+      {
+        "title": "Tauri YouTube OAuth",
+        "width": 980,
+        "height": 720,
+        "resizable": true
+      }
+    ],
+    "allowlist": {
+      "all": true
+    },
+    "security": {
+      "csp": null
+    }
+  }
+}
