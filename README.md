@@ -31,6 +31,7 @@ make preview  # http://localhost:8080
 - **Free TTS** (edge-tts, wiele głosów) → [`generate_audio()`](src/ytlite.py#L120)
 - **Proste slajdy** (bez skomplikowanych animacji) → [`create_slides()`](src/ytlite.py#L90)
 - **Auto-upload** do YouTube → [`youtube_uploader.py`](src/youtube_uploader.py)
+- **OAuth Desktop App** (bezpieczna autoryzacja) → [`tauri-youtube-oauth/`](tauri-youtube-oauth/)
 - **Dzienny scheduler** (ustaw i zapomnij) → [`scheduler.py`](src/scheduler.py)
 - **Docker support** (zero instalacji) → [`Dockerfile`](Dockerfile) + [`docker-compose.yml`](docker-compose.yml)
 
@@ -76,16 +77,34 @@ make preview  # http://localhost:8080
 
 ## Docker
 
+### 🐳 Docker - Optymalna Architektura
+
+### 🚀 Split Build (Zalecane)
 ```bash
-# Zbuduj i uruchom
-make docker-run
+# Pierwszy raz - zbuduj base (6 min, raz na miesiąc)
+make docker-build-base
 
-# Automatyzacja
-make automation
+# Codzienna praca - tylko app (30s)
+make docker-build-fast
 
-# Preview
+# Development z live reload
+make docker-dev
+
+# Preview  
 make preview  # http://localhost:8080
 ```
+
+### 🔧 Pełne buildy
+```bash
+make docker-build      # Base + App (pierwszy raz)
+make docker-run        # Uruchom wszystkie serwisy
+make docker-shell      # Otwórz shell w kontenerze
+```
+
+### ⚡ Dlaczego split architecture?
+- **Base image**: Heavy dependencies (ffmpeg, sox) - cache na miesiące
+- **App image**: Kod aplikacji - rebuild w 30s
+- **80% szybszy** development workflow
 
 ## Konfiguracja
 

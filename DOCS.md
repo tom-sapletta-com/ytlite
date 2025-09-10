@@ -71,23 +71,51 @@ SCHEDULE_TIME=09:00
 - `make daily` (linia 40) - pełen dzienny pipeline
 - `make automation` (linia 50) - uruchom scheduler
 
-## 🐳 Docker Configuration
+## 🐳 Docker Split Architecture
 
-### [`Dockerfile`](Dockerfile)
+### Base Image ([`Dockerfile.base`](Dockerfile.base))
 ```dockerfile
 FROM python:3.11-slim
-# System dependencies: ffmpeg, sox, espeak-ng
-RUN apt-get update && apt-get install -y ffmpeg sox espeak-ng
-# Python environment setup
+# Heavy system dependencies (cached for months)
+RUN apt-get install ffmpeg sox espeak-ng  # ~300MB
+```
+
+### App Image ([`Dockerfile.app`](Dockerfile.app))  
+```dockerfile
+FROM ytlite:base
+# Light application layer (rebuild in 30s)
+COPY src/ config.yaml requirements.txt  # ~5MB
+```
+
+### Multi-stage Build ([`Dockerfile`](Dockerfile))
+```dockerfile
+# Stage 1: Base dependencies
+FROM python:3.11-slim AS base
+RUN apt-get install ffmpeg sox espeak-ng
+
+# Stage 2: Python deps  
+FROM base AS python-deps
 COPY requirements.txt .
-RUN pip install -r requirements.txt
+RUN pip install --user -r requirements.txt
+
+# Stage 3: Final app
+FROM base AS final
+COPY --from=python-deps /root/.local /root/.local
+COPY src/ config.yaml .
 ```
 
 ### [`docker-compose.yml`](docker-compose.yml)
 **Services:**
+- `ytlite-base` - base image builder
 - `ytlite` - główny generator (port mapping, volume mounts)
+- `ytlite-dev` - development z live reload
 - `nginx` - preview server (localhost:8080)
 - `scheduler` - automated daily generation
+
+### Performance Optimization:
+- **First build**: Base (6min) + App (30s) = 6.5min
+- **Code changes**: App only = 30s ⚡
+- **Dependency changes**: Base + App = 6.5min
 
 ## 📝 Content Format
 

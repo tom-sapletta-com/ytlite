@@ -209,60 +209,6 @@ async fn generate_env(app: AppHandle) -> Result<String, String> {
 }
 
 fn main() {
-  // Spawn a lightweight OAuth callback server on 127.0.0.1:14321/callback
-  {
-    let cfg_dir = tauri::api::path::app_config_dir(&tauri::Config::default()).unwrap_or_else(|| std::env::temp_dir());
-    let tokens_file = cfg_dir.join("tokens.json");
-    let config_file = cfg_dir.join("oauth_config.json");
-    let _ = std::fs::create_dir_all(&cfg_dir);
-
-    std::thread::spawn(move || {
-      let rt = tokio::runtime::Builder::new_multi_thread().enable_all().build().expect("tokio runtime");
-      rt.block_on(async move {
-        let route = warp::path("callback")
-          .and(warp::get())
-          .and(warp::query::<std::collections::HashMap<String, String>>())
-          .map(move |params: std::collections::HashMap<String, String>| {
-            let code = params.get("code").cloned();
-            let tokens_file = tokens_file.clone();
-            let config_file = config_file.clone();
-            tokio::spawn(async move {
-              if let Some(code) = code {
-                let cfg_text = std::fs::read_to_string(&config_file).unwrap_or_default();
-                let cfg: Option<AppConfig> = serde_json::from_str(&cfg_text).ok();
-                if let Some(cfg) = cfg {
-                  let redirect = "http://127.0.0.1:14321/callback";
-                  let params = [
-                    ("code", code.as_str()),
-                    ("client_id", cfg.client_id.as_str()),
-                    ("client_secret", cfg.client_secret.as_str()),
-                    ("redirect_uri", redirect),
-                    ("grant_type", "authorization_code"),
-                  ];
-                  let client = reqwest::Client::new();
-                  if let Ok(resp) = client.post("https://oauth2.googleapis.com/token").form(&params).send().await {
-                    if let Ok(json) = resp.json::<serde_json::Value>().await {
-                      let access = json.get("access_token").and_then(|v| v.as_str()).unwrap_or("").to_string();
-                      let refresh = json.get("refresh_token").and_then(|v| v.as_str()).unwrap_or("").to_string();
-                      let expires_in = json.get("expires_in").and_then(|v| v.as_u64()).unwrap_or(0);
-                      if !access.is_empty() {
-                        let t = Tokens { access_token: access, refresh_token: refresh, expires_in, created_at: now_secs() };
-                        if let Ok(s) = serde_json::to_string_pretty(&t) {
-                          let _ = std::fs::write(&tokens_file, s);
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            });
-            warp::reply::html("<html><body><h2>Autoryzacja zakończona. Możesz zamknąć to okno.</h2></body></html>")
-          });
-        warp::serve(route).run(([127, 0, 0, 1], 14321)).await;
-      });
-    });
-  }
-
   tauri::Builder::default()
     .invoke_handler(tauri::generate_handler![
       get_config,
@@ -276,7 +222,56 @@ fn main() {
     ])
     .setup(|app| {
       // Ensure config dir exists
-      if let Ok(dir) = app_config_dir(&app.handle()) { let _ = fs::create_dir_all(dir); }
+      if let Ok(dir) = app_config_dir(&app.handle()) { let _ = fs::create_dir_all(dir.clone());
+        // Spawn the OAuth callback server using the app's config dir
+        let tokens_file = dir.join("tokens.json");
+        let config_file = dir.join("oauth_config.json");
+        std::thread::spawn(move || {
+          let rt = tokio::runtime::Builder::new_multi_thread().enable_all().build().expect("tokio runtime");
+          rt.block_on(async move {
+            let route = warp::path("callback")
+              .and(warp::get())
+              .and(warp::query::<std::collections::HashMap<String, String>>())
+              .map(move |params: std::collections::HashMap<String, String>| {
+                let code = params.get("code").cloned();
+                let tokens_file = tokens_file.clone();
+                let config_file = config_file.clone();
+                tokio::spawn(async move {
+                  if let Some(code) = code {
+                    let cfg_text = std::fs::read_to_string(&config_file).unwrap_or_default();
+                    let cfg: Option<AppConfig> = serde_json::from_str(&cfg_text).ok();
+                    if let Some(cfg) = cfg {
+                      let redirect = "http://127.0.0.1:14321/callback";
+                      let params = [
+                        ("code", code.as_str()),
+                        ("client_id", cfg.client_id.as_str()),
+                        ("client_secret", cfg.client_secret.as_str()),
+                        ("redirect_uri", redirect),
+                        ("grant_type", "authorization_code"),
+                      ];
+                      let client = reqwest::Client::new();
+                      if let Ok(resp) = client.post("https://oauth2.googleapis.com/token").form(&params).send().await {
+                        if let Ok(json) = resp.json::<serde_json::Value>().await {
+                          let access = json.get("access_token").and_then(|v| v.as_str()).unwrap_or("").to_string();
+                          let refresh = json.get("refresh_token").and_then(|v| v.as_str()).unwrap_or("").to_string();
+                          let expires_in = json.get("expires_in").and_then(|v| v.as_u64()).unwrap_or(0);
+                          if !access.is_empty() {
+                            let t = Tokens { access_token: access, refresh_token: refresh, expires_in, created_at: now_secs() };
+                            if let Ok(s) = serde_json::to_string_pretty(&t) {
+                              let _ = std::fs::write(&tokens_file, s);
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                });
+                warp::reply::html("<html><body><h2>Autoryzacja zakończona. Możesz zamknąć to okno.</h2></body></html>")
+              });
+            warp::serve(route).run(([127, 0, 0, 1], 14321)).await;
+          });
+        });
+      }
       Ok(())
     })
     .run(tauri::generate_context!())
