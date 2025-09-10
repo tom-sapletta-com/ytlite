@@ -12,18 +12,21 @@ from rich.console import Console
 
 console = Console()
 
-# Lazy import moviepy to handle installation issues
-def get_moviepy():
-    """Import moviepy with error handling"""
-    try:
-        from moviepy.editor import (
-            VideoFileClip, TextClip, CompositeVideoClip, 
-            ImageClip, concatenate_videoclips, AudioFileClip
-        )
-        return VideoFileClip, TextClip, CompositeVideoClip, ImageClip, concatenate_videoclips, AudioFileClip
-    except ImportError:
-        console.print("[red]MoviePy not available. Please run dependency check first.[/]")
-        raise
+# Import moviepy directly
+try:
+    from moviepy.editor import (
+        VideoFileClip, TextClip, CompositeVideoClip, 
+        ImageClip, concatenate_videoclips, AudioFileClip
+    )
+except ImportError:
+    console.print("[red]MoviePy not available. Installing...[/]")
+    import subprocess
+    import sys
+    subprocess.check_call([sys.executable, "-m", "pip", "install", "moviepy"])
+    from moviepy.editor import (
+        VideoFileClip, TextClip, CompositeVideoClip, 
+        ImageClip, concatenate_videoclips, AudioFileClip
+    )
 
 class VideoGenerator:
     def __init__(self, config):
@@ -70,7 +73,6 @@ class VideoGenerator:
     
     def create_video_from_slides(self, slides: List[str], audio_path: str, output_path: str):
         """Create video from slide images and audio"""
-        VideoFileClip, TextClip, CompositeVideoClip, ImageClip, concatenate_videoclips, AudioFileClip = get_moviepy()
         
         console.print(f"[cyan]Creating video from {len(slides)} slides...[/]")
         
@@ -110,7 +112,6 @@ class VideoGenerator:
     
     def create_shorts(self, video_path: str, output_path: str):
         """Create YouTube Shorts from video"""
-        VideoFileClip, TextClip, CompositeVideoClip, ImageClip, concatenate_videoclips, AudioFileClip = get_moviepy()
         
         console.print(f"[cyan]Creating Shorts from {video_path}...[/]")
         
