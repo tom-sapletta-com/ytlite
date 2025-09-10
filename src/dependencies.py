@@ -28,17 +28,23 @@ def check_and_install_package(package_name, import_name=None):
             console.print(f"[red]✗ Failed to install {package_name}[/]")
             return False
 
-def check_ffmpeg():
-    """Check if ffmpeg is installed and available in PATH"""
-    console.print("[cyan]Checking for ffmpeg...[/]")
+def check_os_dependencies():
+    """Run the universal OS dependency installer script."""
+    console.print("[cyan]Checking OS-level dependencies (e.g., ffmpeg)...[/]")
+    script_path = Path(__file__).parent.parent / "scripts" / "install-os-deps.sh"
+    
+    if not script_path.exists():
+        console.print(f"[red]Error: Dependency installer script not found at {script_path}[/]")
+        return False
+
     try:
-        subprocess.check_output(["ffmpeg", "-version"], stderr=subprocess.STDOUT)
-        console.print("[green]✓ ffmpeg is installed.[/]")
+        # Make sure the script is executable
+        subprocess.check_call(["chmod", "+x", str(script_path)])
+        # Run the script
+        subprocess.check_call([str(script_path)])
         return True
-    except (subprocess.CalledProcessError, FileNotFoundError):
-        console.print("[bold red]✗ ffmpeg not found. Please install ffmpeg and ensure it is in your PATH.[/]")
-        console.print("  On Debian/Ubuntu: sudo apt-get install ffmpeg")
-        console.print("  On macOS (Homebrew): brew install ffmpeg")
+    except subprocess.CalledProcessError as e:
+        console.print(f"[red]OS dependency installation failed: {e}[/]")
         return False
 
 def verify_dependencies():
@@ -61,7 +67,8 @@ def verify_dependencies():
         if not check_and_install_package(package, import_name):
             all_ok = False
     
-    if not check_ffmpeg():
+    # Check OS-level dependencies like ffmpeg
+    if not check_os_dependencies():
         all_ok = False
 
     if all_ok:
