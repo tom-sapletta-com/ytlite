@@ -105,10 +105,11 @@ class YTLite:
             font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 
                                      self.config["font_size"])
         except:
+            console.print("[yellow]Warning: Could not load DejaVuSans-Bold font. Falling back to default.[/]")
             try:
                 font = ImageFont.load_default()
             except:
-                # Fallback for minimal environments
+                console.print("[red]Error: Could not load any font. Text rendering may fail.[/]")
                 font = None
         
         # Simple text wrapping
@@ -261,7 +262,7 @@ class YTLite:
             txt_clip = txt_clip.set_position(('center', 'bottom')).set_duration(short_clip.duration)
             final_short = CompositeVideoClip([short_clip, txt_clip])
         except:
-            # Fallback without text overlay if TextClip fails
+            console.print("[yellow]Warning: TextClip failed. Falling back to video without watermark.[/]")
             final_short = short_clip
         
         # Export
@@ -303,7 +304,12 @@ class YTLite:
         try:
             font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 60)
         except:
-            font = ImageFont.load_default()
+            console.print("[yellow]Warning: Could not load DejaVuSans-Bold font. Falling back to default.[/]")
+            try:
+                font = ImageFont.load_default()
+            except:
+                console.print("[red]Error: Could not load any font. Text rendering may fail.[/]")
+                font = None
         
         # Wrap title
         words = title.split()
@@ -396,7 +402,7 @@ Pomyśl o tym dzisiaj. Kiedy ostatni raz byłeś w pełni obecny, bez telefonu w
     generator.create_video_from_markdown(filename)
     
     console.print("[bold green]✓ Daily content ready![/]")
-
+    
 @cli.command()
 def stats():
     """Show channel statistics"""

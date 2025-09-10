@@ -1,4 +1,4 @@
-# YTLite - Minimalistyczny Pipeline YouTube 🎬
+# YTLite - Minimalistyczny Pipeline YouTube 
 
 **Filozofia:** Simple > Complex, Consistency > Perfection
 
@@ -106,6 +106,8 @@ make docker-shell      # Otwórz shell w kontenerze
 - **App image**: Kod aplikacji - rebuild w 30s
 - **80% szybszy** development workflow
 
+**Uwaga**: Pierwszy build obrazu bazowego może trwać do 6 minut ze względu na ciężkie zależności. Kolejne buildy aplikacji są znacznie szybsze. Więcej szczegółów w [DOCS.md](DOCS.md#docker-split-architecture).
+
 ## Konfiguracja
 
 ### 🔑 Pliki konfiguracyjne:
@@ -162,10 +164,14 @@ make stats
 | `make generate` | Wygeneruj filmy z markdown | [Makefile:17](Makefile#L17) |
 | `make shorts` | Stwórz Shorts z istniejących filmów | [Makefile:25](Makefile#L25) |
 | `make upload` | Wgraj na YouTube | [Makefile:30](Makefile#L30) |
-| `make publish` | Pełen pipeline (bez upload) | [Makefile:35](Makefile#L35) |
+| `make publish` | Pełny pipeline (bez upload) | [Makefile:35](Makefile#L35) |
 | `make daily` | Generuj daily content | [Makefile:40](Makefile#L40) |
 | `make preview` | Preview na localhost:8080 | [Makefile:70](Makefile#L70) |
 | `make clean` | Wyczyść pliki | [Makefile:100](Makefile#L100) |
+| `make docker-tts` | Uruchom usługę TTS | [Makefile:85](Makefile#L85) |
+| `make docker-video` | Uruchom usługę generowania wideo | [Makefile:90](Makefile#L90) |
+| `make docker-upload` | Uruchom usługę uploadu na YouTube | [Makefile:95](Makefile#L95) |
+| `make docker-all-services` | Uruchom wszystkie wyspecjalizowane usługi | [Makefile:100](Makefile#L100) |
 
 ## Dlaczego YTLite?
 
@@ -203,7 +209,7 @@ make dev-watch  # Auto-generuj przy zmianie plików
 
 - Python 3.9+
 - FFmpeg
-- Docker (opcjonalne)
+- Docker (opcjonalnie)
 
 ## Instalacja
 

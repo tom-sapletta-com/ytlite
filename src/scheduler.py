@@ -88,16 +88,19 @@ class ContentScheduler:
         
         # Upload if auto-upload is enabled
         if os.getenv("AUTO_UPLOAD", "false").lower() == "true":
-            with open(filename, 'r') as f:
-                import frontmatter
-                post = frontmatter.load(f)
-                title = post.metadata.get('title', prompt)
-                tags = post.metadata.get('tags', [theme])
-            
-            self.uploader.upload_video(video_path, title, tags=tags)
-            
-            if os.getenv("GENERATE_SHORTS", "true").lower() == "true":
-                self.uploader.upload_shorts(shorts_path, title)
+            if not self.uploader.youtube:
+                console.print("[red]Error: YouTube uploader is not authenticated. Skipping upload.[/]")
+            else:
+                with open(filename, 'r') as f:
+                    import frontmatter
+                    post = frontmatter.load(f)
+                    title = post.metadata.get('title', prompt)
+                    tags = post.metadata.get('tags', [theme])
+                
+                self.uploader.upload_video(video_path, title, tags=tags)
+                
+                if os.getenv("GENERATE_SHORTS", "true").lower() == "true":
+                    self.uploader.upload_shorts(shorts_path, title)
         
         console.print("[bold green]✅ Daily content complete![/]")
     

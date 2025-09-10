@@ -8,7 +8,7 @@ Aplikacja desktop do bezpiecznej autoryzacji YouTube API bez konieczności hosto
 
 Tauri OAuth app rozwiązuje problem callbacku OAuth2 w YTLite:
 - **Problem**: YouTube OAuth wymaga callback URL, ale YTLite to CLI tool
-- **Rozwiązanie**: Desktop app z wbudowanym web serverem na `localhost:1420`
+- **Rozwiązanie**: Desktop app z wbudowanym web serverem na `localhost:14321`
 - **Bezpieczeństwo**: Tokeny przechowywane lokalnie, nie w chmurze
 
 ## 🏗️ Architektura
@@ -58,7 +58,7 @@ npm install
 3. Włącz **YouTube Data API v3**
 4. Idź do **Credentials** → **Create Credentials** → **OAuth 2.0 Client ID**
 5. **Application type**: Desktop application
-6. **Authorized redirect URIs**: `http://127.0.0.1:1420/callback`
+6. **Authorized redirect URIs**: `http://127.0.0.1:14321/callback`
 
 ### 3. Uruchomienie
 ```bash
@@ -87,7 +87,7 @@ const config = {
 1. Użytkownik klika "Zaloguj do YouTube"
 2. Otwiera się przeglądarka z Google OAuth
 3. Użytkownik loguje się i daje uprawnienia
-4. Google przekierowuje na localhost:1420/callback?code=...
+4. Google przekierowuje na localhost:14321/callback?code=...
 5. Tauri app przechwytuje code i wymienia na tokeny
 6. Tokeny zapisywane lokalnie w ~/.ytlite/tokens.json
 ```
@@ -169,7 +169,7 @@ const env = await invoke('generate_env')
 1. **"Invalid redirect URI"**
    ```bash
    # Sprawdź dokładnie URI w Google Console
-   http://127.0.0.1:1420/callback  # nie localhost!
+   http://127.0.0.1:14321/callback  # nie localhost!
    ```
 
 2. **Tauri dev nie startuje**

@@ -9,6 +9,7 @@ import pickle
 from pathlib import Path
 from typing import Dict, Optional
 from datetime import datetime
+import platform
 
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
@@ -48,14 +49,20 @@ class SimpleYouTubeUploader:
             if creds and creds.expired and creds.refresh_token:
                 creds.refresh(Request())
             else:
-                if not os.path.exists(self.credentials_file):
-                    console.print(f"[red]Error: {self.credentials_file} not found![/]")
-                    console.print("[yellow]Please download your YouTube API credentials from Google Cloud Console[/]")
-                    return None
+                # Try alternative path: use .env client credentials + tokens from Tauri app or env
+                alt_creds = self._load_credentials_from_env_or_tauri()
+                if alt_creds:
+                    creds = alt_creds
+                else:
+                    if not os.path.exists(self.credentials_file):
+                        console.print(f"[red]Error: {self.credentials_file} not found![/]")
+                        console.print("[yellow]Please download your YouTube API credentials from Google Cloud Console,\n"
+                                       "or use the Tauri OAuth app to generate tokens and set YOUTUBE_CLIENT_ID/SECRET in .env[/]")
+                        return None
                     
-                flow = InstalledAppFlow.from_client_secrets_file(
-                    self.credentials_file, self.SCOPES)
-                creds = flow.run_local_server(port=0)
+                    flow = InstalledAppFlow.from_client_secrets_file(
+                        self.credentials_file, self.SCOPES)
+                    creds = flow.run_local_server(port=0)
             
             # Save token
             os.makedirs(os.path.dirname(token_file), exist_ok=True)
@@ -63,6 +70,67 @@ class SimpleYouTubeUploader:
                 pickle.dump(creds, token)
         
         return build('youtube', 'v3', credentials=creds) if creds else None
+
+    def _tauri_config_dir(self) -> Path:
+        """Resolve Tauri app config dir path for identifier com.ytlite.oauth."""
+        ident = "com.ytlite.oauth"
+        system = platform.system().lower()
+        # Allow override via env
+        override = os.getenv("TAURI_CONFIG_DIR")
+        if override:
+            return Path(override)
+        if system == 'linux':
+            return Path.home() / ".config" / ident
+        elif system == 'darwin':  # macOS
+            return Path.home() / "Library" / "Application Support" / ident
+        else:  # Windows
+            appdata = os.getenv('APPDATA')
+            if appdata:
+                return Path(appdata) / ident
+            return Path.home() / "AppData" / "Roaming" / ident
+
+    def _load_credentials_from_env_or_tauri(self) -> Optional[Credentials]:
+        """Attempt to build Credentials from .env client details and tokens from Tauri or env.
+        Returns google.oauth2.credentials.Credentials or None."""
+        client_id = os.getenv("YOUTUBE_CLIENT_ID")
+        client_secret = os.getenv("YOUTUBE_CLIENT_SECRET")
+        if not client_id or not client_secret:
+            return None
+        # First, tokens via env (optional)
+        env_access = os.getenv("YOUTUBE_ACCESS_TOKEN", "")
+        env_refresh = os.getenv("YOUTUBE_REFRESH_TOKEN", "")
+        access_token = env_access
+        refresh_token = env_refresh
+        
+        # If no env tokens, try Tauri tokens.json
+        if not refresh_token:
+            tokens_file = self._tauri_config_dir() / "tokens.json"
+            if tokens_file.exists():
+                try:
+                    data = json.loads(tokens_file.read_text())
+                    access_token = data.get("access_token", "")
+                    refresh_token = data.get("refresh_token", "")
+                except Exception as e:
+                    console.print(f"[red]Failed to read Tauri tokens: {e}[/]")
+                    return None
+        
+        if not refresh_token and not access_token:
+            return None
+        
+        try:
+            creds = Credentials(
+                token=access_token or None,
+                refresh_token=refresh_token or None,
+                token_uri="https://oauth2.googleapis.com/token",
+                client_id=client_id,
+                client_secret=client_secret,
+                scopes=self.SCOPES,
+            )
+            # If only refresh token, let API refresh when needed
+            return creds
+        except Exception as e:
+            console.print(f"[red]Failed to construct Credentials from env/tauri: {e}[/]")
+            return None
     
     def upload_video(self, 
                      video_path: Path,
@@ -126,7 +194,21 @@ class SimpleYouTubeUploader:
             return video_url
         except Exception as e:
             console.print(f"[red]Upload failed: {e}[/]")
-            return None
+            console.print("[yellow]Retrying upload once...[/]")
+            try:
+                request = self.youtube.videos().insert(
+                    part=','.join(body.keys()),
+                    body=body,
+                    media_body=media
+                )
+                response = request.execute()
+                video_url = f"https://youtube.com/watch?v={response['id']}"
+                console.print(f"[bold green]✓ Uploaded on retry:[/] {video_url}")
+                self._save_upload_record(video_path, video_url, response['id'])
+                return video_url
+            except Exception as retry_e:
+                console.print(f"[red]Retry failed: {retry_e}[/]")
+                return None
     
     def upload_shorts(self, 
                       shorts_path: Path,

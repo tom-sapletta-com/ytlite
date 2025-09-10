@@ -111,11 +111,24 @@ COPY src/ config.yaml .
 - `ytlite-dev` - development z live reload
 - `nginx` - preview server (localhost:8080)
 - `scheduler` - automated daily generation
+- `tts-service` - usługa generowania audio TTS
+- `video-generator` - usługa generowania wideo
+- `uploader` - usługa uploadu na YouTube
 
 ### Performance Optimization:
 - **First build**: Base (6min) + App (30s) = 6.5min
 - **Code changes**: App only = 30s ⚡
 - **Dependency changes**: Base + App = 6.5min
+
+### Troubleshooting Docker Build Issues:
+- **Long Build Times**: The initial build of the base image can take up to 6 minutes due to heavy dependencies like `ffmpeg` and `sox`. Subsequent builds of the app image are much faster (~30s). To avoid rebuilding the base image unnecessarily, YTLite checks if the image exists before rebuilding. Use `docker rmi ytlite:base` to force a rebuild if needed.
+- **Missing Dependencies**: Ensure all system dependencies are installed in the base image. If you encounter errors related to missing packages, you may need to add them to `Dockerfile.base`.
+- **Docker Compose Errors**: If Docker Compose fails to start services, ensure it is installed and properly configured. Check the logs with `docker-compose logs` for detailed error messages.
+
+### Optimizing Docker Performance:
+- **Use Split Architecture**: Build the base image once and reuse it for faster app image builds with `make docker-build-fast`.
+- **Dedicated Services**: Consider using more specialized Docker services for different tasks (e.g., separate containers for TTS, video generation, and upload) to parallelize workloads and improve build times. This can be achieved by modifying `docker-compose.yml` to define additional services. Use commands like `make docker-tts`, `make docker-video`, `make docker-upload`, or `make docker-all-services` to run these services.
+- **Pre-built Images**: If build times are still an issue, consider using pre-built images from a Docker registry to skip the build process entirely. You can pull these images with `docker pull` and tag them appropriately for use with YTLite.
 
 ## 📝 Content Format
 
@@ -223,6 +236,10 @@ sudo systemctl start ytlite
 2. **Upload Failed**: Zweryfikuj YouTube API credentials  
 3. **Video Generation Error**: Sprawdź FFmpeg installation
 4. **Permission Denied**: `chmod +x install.sh`
+
+### Zgłaszanie Problemów:
+- Jeśli napotkasz problem, którego nie możesz rozwiązać, zgłoś go na [GitHub Issues](https://github.com/tom-sapletta-com/ytlite/issues).
+- Upewnij się, że dołączasz szczegółowe informacje o błędzie, w tym logi i kroki do odtworzenia problemu.
 
 ### Debug mode:
 ```bash

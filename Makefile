@@ -50,12 +50,20 @@ daily: ## Generate daily content automatically
 # Docker commands
 docker-build-base: ## Build base Docker image (heavy dependencies)
 	@echo "$(YELLOW)🐳 Building base Docker image...$(NC)"
-	docker build -f Dockerfile.base -t ytlite:base .
+	@if docker images | grep -q "ytlite:base"; then \
+		echo "$(YELLOW)Base image already exists. Skipping rebuild. Use 'docker rmi ytlite:base' to force rebuild.$(NC)"; \
+	else \
+		docker build -f Dockerfile.base -t ytlite:base .; \
+	fi
 	@echo "$(GREEN)✅ Base Docker image built (cached for future builds)$(NC)"
 
 docker-build-app: ## Build app Docker image (light, fast rebuilds)
 	@echo "$(YELLOW)🐳 Building app Docker image...$(NC)"
-	docker build -f Dockerfile.app -t ytlite:app .
+	@if docker images | grep -q "ytlite:app"; then \
+		echo "$(YELLOW)App image already exists. Skipping rebuild. Use 'docker rmi ytlite:app' to force rebuild.$(NC)"; \
+	else \
+		docker build -f Dockerfile.app -t ytlite:app .; \
+	fi
 	@echo "$(GREEN)✅ App Docker image built$(NC)"
 
 docker-build: docker-build-base docker-build-app ## Build both Docker images
@@ -78,6 +86,26 @@ docker-dev: ## Run development environment with live reload
 docker-shell: ## Open shell in Docker container
 	@echo "$(YELLOW)🐳 Opening Docker shell...$(NC)"
 	docker run -it --rm -v $(PWD):/app ytlite:app bash
+
+docker-tts: ## Run TTS service for audio generation
+	@echo "$(YELLOW)🔊 Starting TTS service...$(NC)"
+	docker-compose --profile tts up tts-service -d
+	@echo "$(GREEN)✅ TTS service started$(NC)"
+
+docker-video: ## Run video generation service
+	@echo "$(YELLOW)🎬 Starting video generation service...$(NC)"
+	docker-compose --profile video up video-generator -d
+	@echo "$(GREEN)✅ Video generation service started$(NC)"
+
+docker-upload: ## Run upload service for YouTube
+	@echo "$(YELLOW)📤 Starting upload service...$(NC)"
+	docker-compose --profile upload up uploader -d
+	@echo "$(GREEN)✅ Upload service started$(NC)"
+
+docker-all-services: ## Run all specialized services
+	@echo "$(YELLOW)🌐 Starting all specialized services...$(NC)"
+	docker-compose --profile tts --profile video --profile upload up tts-service video-generator uploader -d
+	@echo "$(GREEN)✅ All specialized services started$(NC)"
 
 # Preview and development
 preview: ## Preview output locally on http://localhost:8080
