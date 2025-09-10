@@ -26,8 +26,11 @@ except ImportError:
 try:
     from moviepy.editor import VideoFileClip
 except ImportError:
-    console.print("[red]MoviePy required for video analysis[/]")
-    raise
+    console.print("[yellow]MoviePy not found. Installing...[/]")
+    import subprocess
+    import sys
+    subprocess.check_call([sys.executable, "-m", "pip", "install", "moviepy"])
+    from moviepy.editor import VideoFileClip
 
 class VideoValidator:
     def __init__(self):
