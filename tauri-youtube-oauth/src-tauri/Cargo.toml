@@ -5,6 +5,7 @@ edition = "2021"
 
 [dev-dependencies]
 mockito = "0.31"
+tauri = { version = "1.5.3", features = ["test"] }
 tempfile = "3"
 
 [dependencies]

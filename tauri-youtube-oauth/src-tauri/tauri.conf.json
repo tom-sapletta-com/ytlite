@@ -1,21 +1,9 @@
 {
   "tauri": {
     "bundle": {
-      "active": true,
       "identifier": "com.ytlite.oauth",
-      "icon": [],
-      "targets": "all"
-    },
-    "allowlist": {
-      "all": false
-    },
-    "windows": [
-      {
-        "title": "Tauri YouTube OAuth",
-        "width": 800,
-        "height": 600
-      }
-    ]
-  },
-  "build": {}
+      "active": true,
+      "icon": []
+    }
+  }
 }

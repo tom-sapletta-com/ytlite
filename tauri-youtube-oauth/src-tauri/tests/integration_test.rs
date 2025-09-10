@@ -1,9 +1,9 @@
 #[cfg(test)]
 mod tests {
-    use super::*;
     use tauri::test;
+    use tauri_youtube_oauth::{get_config, set_config, check_tokens, write_tokens, Tokens};
 
-    #[test]
+    #[tokio::test]
     async fn test_set_and_get_config() {
         let (app, _) = test::mock_builder().build().await;
         let app_handle = app.handle();
@@ -19,7 +19,7 @@ mod tests {
         assert_eq!(config.client_secret, client_secret);
     }
 
-    #[test]
+    #[tokio::test]
     async fn test_exchange_code_and_check_tokens() {
         let (app, _) = test::mock_builder().build().await;
         let app_handle = app.handle();

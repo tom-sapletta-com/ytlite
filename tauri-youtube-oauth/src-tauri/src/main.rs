@@ -6,7 +6,7 @@ use tauri::AppHandle;
 use warp::Filter;
 
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]
-struct Tokens {
+pub struct Tokens {
   access_token: String,
   refresh_token: String,
   #[serde(default)]
@@ -16,7 +16,7 @@ struct Tokens {
 }
 
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]
-struct AppConfig {
+pub struct AppConfig {
   client_id: String,
   client_secret: String,
 }
@@ -64,7 +64,7 @@ fn write_tokens_to_dir(dir: &Path, t: &Tokens) -> Result<(), String> {
 fn read_config(app: &AppHandle) -> Option<AppConfig> { read_config_from_dir(&app_config_dir(app).ok()?) }
 fn write_config(app: &AppHandle, cfg: &AppConfig) -> Result<(), String> { write_config_to_dir(&app_config_dir(app)?, cfg) }
 fn read_tokens(app: &AppHandle) -> Option<Tokens> { read_tokens_from_dir(&app_config_dir(app).ok()?) }
-fn write_tokens(app: &AppHandle, t: &Tokens) -> Result<(), String> { write_tokens_to_dir(&app_config_dir(app)?, t) }
+pub fn write_tokens(app: &AppHandle, t: &Tokens) -> Result<(), String> { write_tokens_to_dir(&app_config_dir(app)?, t) }
 
 fn token_endpoint() -> String {
   std::env::var("OAUTH_TOKEN_URL").unwrap_or_else(|_| "https://oauth2.googleapis.com/token".to_string())
@@ -222,7 +222,7 @@ fn main() {
       check_tokens,
       refresh_tokens,
       youtube_list_channels,
-      generate_env
+      generate_env,
     ])
     .setup(|app| {
       // Ensure config dir exists
