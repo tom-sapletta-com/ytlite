@@ -111,3 +111,18 @@ fmt: ## Format Rust and TS sources (best-effort)
 
 clean-all: clean ## Clean including dependencies and Rust target
 	@rm -rf node_modules src-tauri/target
+
+e2e-install: ## Install Playwright browsers (required for E2E tests)
+	@echo "$(YELLOW)🎭 Installing Playwright browsers...$(NC)"
+	npm run e2e:install
+	@echo "$(GREEN)✅ Playwright installed$(NC)"
+
+e2e: ## Run Playwright E2E tests (auto-starts Vite dev server)
+	@echo "$(YELLOW)🎭 Running E2E tests...$(NC)"
+	npm run e2e
+	@echo "$(GREEN)✅ E2E complete$(NC)"
+
+e2e-headed: ## Run Playwright E2E tests in headed mode
+	@echo "$(YELLOW)🎭 Running E2E tests (headed)...$(NC)"
+	npm run e2e:headed
+	@echo "$(GREEN)✅ E2E (headed) complete$(NC)"

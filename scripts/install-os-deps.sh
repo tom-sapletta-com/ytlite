@@ -27,25 +27,28 @@ echo_error() {
 install_deps() {
     PACKAGE_MANAGER=""
     INSTALL_CMD=""
-    PACKAGES="ffmpeg"
-
     # Detect package manager
     if command -v apt-get &> /dev/null; then
         PACKAGE_MANAGER="apt-get"
         INSTALL_CMD="sudo apt-get install -y"
         UPDATE_CMD="sudo apt-get update"
+        PACKAGES="ffmpeg libsoup2.4-dev"
     elif command -v yum &> /dev/null; then
         PACKAGE_MANAGER="yum"
         INSTALL_CMD="sudo yum install -y"
+        PACKAGES="ffmpeg libsoup-devel"
     elif command -v dnf &> /dev/null; then
         PACKAGE_MANAGER="dnf"
         INSTALL_CMD="sudo dnf install -y"
+        PACKAGES="ffmpeg libsoup-devel"
     elif command -v pacman &> /dev/null; then
         PACKAGE_MANAGER="pacman"
         INSTALL_CMD="sudo pacman -S --noconfirm"
+        PACKAGES="ffmpeg libsoup"
     elif command -v brew &> /dev/null; then
         PACKAGE_MANAGER="brew"
         INSTALL_CMD="brew install"
+        PACKAGES="ffmpeg libsoup"
     else
         echo_error "Unsupported package manager. Please install 'ffmpeg' manually."
         exit 1
@@ -53,11 +56,8 @@ install_deps() {
 
     echo_info "Using '$PACKAGE_MANAGER' to install dependencies: $PACKAGES"
 
-    # Check if ffmpeg is already installed
-    if command -v ffmpeg &> /dev/null; then
-        echo_success "'ffmpeg' is already installed."
-        return 0
-    fi
+    # Installation logic is now simpler: just run the install command.
+    # The package manager will handle already installed packages.
 
     # Update and install
     if [ -n "$UPDATE_CMD" ]; then

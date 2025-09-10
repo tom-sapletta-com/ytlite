@@ -1,6 +1,17 @@
-version: '3.8'
-
 services:
+  tauri-dev:
+    build:
+      context: ./tauri-youtube-oauth
+      dockerfile: Dockerfile
+    volumes:
+      - ./tauri-youtube-oauth:/app
+      - /tmp/.X11-unix:/tmp/.X11-unix # Mount X11 socket for GUI apps
+    environment:
+      - DISPLAY=$DISPLAY # Forward display
+    working_dir: /app
+    profiles: ["tauri"]
+    command: tail -f /dev/null
+
   ytlite-base:
     build:
       context: .

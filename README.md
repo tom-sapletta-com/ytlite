@@ -78,38 +78,54 @@ make upload
 make preview  # http://localhost:8080
 ```
 
-## Docker
+## Praca z Dockerem 🐳
 
-### 🐳 Docker - Optymalna Architektura
+Docker to zalecany sposób uruchamiania projektu. Eliminuje problemy z zależnościami i zapewnia spójne środowisko.
 
-### 🚀 Split Build (Zalecane)
-```bash
-# Pierwszy raz - zbuduj base (6 min, raz na miesiąc)
-make docker-build-base
+### Główna Aplikacja (Generowanie Wideo)
 
-# Codzienna praca - tylko app (30s)
-make docker-build-fast
+1.  **Zbuduj obrazy** (tylko za pierwszym razem lub po zmianie zależności):
+    ```bash
+    make docker-build
+    ```
 
-# Development z live reload
-make docker-dev
+2.  **Uruchom usługi** (aplikacja i serwer podglądu):
+    ```bash
+    make docker-up
+    ```
 
-# Preview  
-make preview  # http://localhost:8080
-```
+3.  **Otwórz powłokę w kontenerze**, aby pracować z `make`:
+    ```bash
+    make docker-shell
+    ```
+    Wewnątrz kontenera możesz używać poleceń, tak jak lokalnie:
+    ```bash
+    # Będąc wewnątrz kontenera:
+    make generate
+    make upload
+    ```
 
-### 🔧 Pełne buildy
-```bash
-make docker-build      # Base + App (pierwszy raz)
-make docker-run        # Uruchom wszystkie serwisy
-make docker-shell      # Otwórz shell w kontenerze
-```
+4.  **Zatrzymaj usługi**:
+    ```bash
+    make docker-down
+    ```
 
-### ⚡ Dlaczego split architecture?
-- **Base image**: Heavy dependencies (ffmpeg, sox) - cache na miesiące
-- **App image**: Kod aplikacji - rebuild w 30s
-- **80% szybszy** development workflow
+### Aplikacja Tauri (OAuth Helper)
 
-**Uwaga**: Pierwszy build obrazu bazowego może trwać do 6 minut ze względu na ciężkie zależności. Kolejne buildy aplikacji są znacznie szybsze. Więcej szczegółów w [DOCS.md](DOCS.md#docker-split-architecture).
+1.  **Uruchom kontener deweloperski**:
+    ```bash
+    make tauri-dev
+    ```
+
+2.  **Otwórz powłokę w kontenerze Tauri**:
+    ```bash
+    make tauri-shell
+    ```
+
+3.  **Uruchom testy**:
+    ```bash
+    make tauri-test
+    ```
 
 ## Konfiguracja
 

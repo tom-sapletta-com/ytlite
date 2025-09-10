@@ -6,5 +6,5 @@ YELLOW="\033[1;33m"
 NC="\033[0m" # No Color
 
 echo "${YELLOW}🐳 Starting Docker services...${NC}"
-docker-compose up --build -d
+docker-compose --profile app up --build -d
 echo "${GREEN}✅ Docker services started${NC}"

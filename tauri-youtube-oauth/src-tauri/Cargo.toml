@@ -19,3 +19,6 @@ warp = "0.3"
 
 [build-dependencies]
 tauri-build = { version = "1" }
+
+[dev-dependencies]
+tempfile = "3"

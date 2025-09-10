@@ -1,7 +1,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use serde::{Deserialize, Serialize};
-use std::{fs, path::PathBuf, process::Command, time::{SystemTime, UNIX_EPOCH}};
+use std::{fs, path::{Path, PathBuf}, process::Command, time::{SystemTime, UNIX_EPOCH}};
 use tauri::{AppHandle, Manager};
 
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]
@@ -31,40 +31,68 @@ fn app_config_dir(app: &AppHandle) -> Result<PathBuf, String> {
     .ok_or_else(|| "no app config dir".to_string())
 }
 
-fn config_path(app: &AppHandle) -> Result<PathBuf, String> {
-  Ok(app_config_dir(app)?.join("oauth_config.json"))
-}
+fn config_path(app: &AppHandle) -> Result<PathBuf, String> { Ok(app_config_dir(app)?.join("oauth_config.json")) }
+fn tokens_path(app: &AppHandle) -> Result<PathBuf, String> { Ok(app_config_dir(app)?.join("tokens.json")) }
 
-fn tokens_path(app: &AppHandle) -> Result<PathBuf, String> {
-  Ok(app_config_dir(app)?.join("tokens.json"))
-}
-
-fn read_config(app: &AppHandle) -> Option<AppConfig> {
-  let path = config_path(app).ok()?;
-  let s = fs::read_to_string(path).ok()?;
-  serde_json::from_str(&s).ok()
-}
-
-fn write_config(app: &AppHandle, cfg: &AppConfig) -> Result<(), String> {
-  let dir = app_config_dir(app)?;
-  fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
-  let p = config_path(app)?;
-  let s = serde_json::to_string_pretty(cfg).map_err(|e| e.to_string())?;
-  fs::write(p, s).map_err(|e| e.to_string())
-}
-
-fn read_tokens(app: &AppHandle) -> Option<Tokens> {
-  let p = tokens_path(app).ok()?;
+fn read_config_from_dir(dir: &Path) -> Option<AppConfig> {
+  let p = dir.join("oauth_config.json");
   let s = fs::read_to_string(p).ok()?;
   serde_json::from_str(&s).ok()
 }
 
-fn write_tokens(app: &AppHandle, t: &Tokens) -> Result<(), String> {
-  let dir = app_config_dir(app)?;
-  fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
-  let p = tokens_path(app)?;
+fn write_config_to_dir(dir: &Path, cfg: &AppConfig) -> Result<(), String> {
+  fs::create_dir_all(dir).map_err(|e| e.to_string())?;
+  let p = dir.join("oauth_config.json");
+  let s = serde_json::to_string_pretty(cfg).map_err(|e| e.to_string())?;
+  fs::write(p, s).map_err(|e| e.to_string())
+}
+
+fn read_tokens_from_dir(dir: &Path) -> Option<Tokens> {
+  let p = dir.join("tokens.json");
+  let s = fs::read_to_string(p).ok()?;
+  serde_json::from_str(&s).ok()
+}
+
+fn write_tokens_to_dir(dir: &Path, t: &Tokens) -> Result<(), String> {
+  fs::create_dir_all(dir).map_err(|e| e.to_string())?;
+  let p = dir.join("tokens.json");
   let s = serde_json::to_string_pretty(t).map_err(|e| e.to_string())?;
   fs::write(p, s).map_err(|e| e.to_string())
+}
+
+fn read_config(app: &AppHandle) -> Option<AppConfig> { read_config_from_dir(&app_config_dir(app).ok()?) }
+fn write_config(app: &AppHandle, cfg: &AppConfig) -> Result<(), String> { write_config_to_dir(&app_config_dir(app)?, cfg) }
+fn read_tokens(app: &AppHandle) -> Option<Tokens> { read_tokens_from_dir(&app_config_dir(app).ok()?) }
+fn write_tokens(app: &AppHandle, t: &Tokens) -> Result<(), String> { write_tokens_to_dir(&app_config_dir(app)?, t) }
+
+fn token_endpoint() -> String {
+  std::env::var("OAUTH_TOKEN_URL").unwrap_or_else(|_| "https://oauth2.googleapis.com/token".to_string())
+}
+
+async fn perform_token_exchange(client_id: &str, client_secret: &str, code: &str, redirect: &str) -> Result<Tokens, String> {
+  let params = [
+    ("code", code),
+    ("client_id", client_id),
+    ("client_secret", client_secret),
+    ("redirect_uri", redirect),
+    ("grant_type", "authorization_code"),
+  ];
+  let client = reqwest::Client::new();
+  let resp = client.post(&token_endpoint()).form(&params).send().await.map_err(|e| e.to_string())?;
+  let json: serde_json::Value = resp.json().await.map_err(|e| e.to_string())?;
+  let access = json.get("access_token").and_then(|v| v.as_str()).unwrap_or_default().to_string();
+  let refresh = json.get("refresh_token").and_then(|v| v.as_str()).unwrap_or_default().to_string();
+  let expires_in = json.get("expires_in").and_then(|v| v.as_u64()).unwrap_or(0);
+  if access.is_empty() { return Err(format!("Błąd wymiany tokenów: {}", json)); }
+  Ok(Tokens { access_token: access, refresh_token: refresh, expires_in, created_at: now_secs() })
+}
+
+async fn exchange_and_persist(cfg_dir: &Path, code: &str) -> Result<Tokens, String> {
+  let cfg: AppConfig = read_config_from_dir(cfg_dir).ok_or("Brak konfiguracji klienta".to_string())?;
+  let redirect = "http://127.0.0.1:14321/callback";
+  let t = perform_token_exchange(&cfg.client_id, &cfg.client_secret, code, redirect).await?;
+  write_tokens_to_dir(cfg_dir, &t)?;
+  Ok(t)
 }
 
 #[tauri::command]
@@ -103,36 +131,8 @@ async fn start_oauth(app: AppHandle) -> Result<(), String> {
 
 #[tauri::command]
 async fn exchange_code(app: AppHandle, code: String) -> Result<Tokens, String> {
-  let cfg = read_config(&app).ok_or("Brak konfiguracji klienta".to_string())?;
-  let redirect = "http://127.0.0.1:14321/callback";
-  let params = [
-    ("code", code.as_str()),
-    ("client_id", cfg.client_id.as_str()),
-    ("client_secret", cfg.client_secret.as_str()),
-    ("redirect_uri", redirect),
-    ("grant_type", "authorization_code"),
-  ];
-
-  let client = reqwest::Client::new();
-  let resp = client
-    .post("https://oauth2.googleapis.com/token")
-    .form(&params)
-    .send()
-    .await
-    .map_err(|e| e.to_string())?;
-
-  let json: serde_json::Value = resp.json().await.map_err(|e| e.to_string())?;
-  let access = json.get("access_token").and_then(|v| v.as_str()).unwrap_or_default().to_string();
-  let refresh = json.get("refresh_token").and_then(|v| v.as_str()).unwrap_or_default().to_string();
-  let expires_in = json.get("expires_in").and_then(|v| v.as_u64()).unwrap_or(0);
-
-  if access.is_empty() {
-    return Err(format!("Błąd wymiany tokenów: {}", json));
-  }
-
-  let t = Tokens { access_token: access, refresh_token: refresh, expires_in, created_at: now_secs() };
-  write_tokens(&app, &t)?;
-  Ok(t)
+  let dir = app_config_dir(&app)?;
+  exchange_and_persist(&dir, &code).await
 }
 
 #[tauri::command]
@@ -155,7 +155,7 @@ async fn refresh_tokens(app: AppHandle) -> Result<Tokens, String> {
   ];
   let client = reqwest::Client::new();
   let resp = client
-    .post("https://oauth2.googleapis.com/token")
+    .post(&token_endpoint())
     .form(&params)
     .send()
     .await
@@ -241,31 +241,8 @@ fn main() {
                 let config_file = config_file.clone();
                 tokio::spawn(async move {
                   if let Some(code) = code {
-                    let cfg_text = std::fs::read_to_string(&config_file).unwrap_or_default();
-                    let cfg: Option<AppConfig> = serde_json::from_str(&cfg_text).ok();
-                    if let Some(cfg) = cfg {
-                      let redirect = "http://127.0.0.1:14321/callback";
-                      let params = [
-                        ("code", code.as_str()),
-                        ("client_id", cfg.client_id.as_str()),
-                        ("client_secret", cfg.client_secret.as_str()),
-                        ("redirect_uri", redirect),
-                        ("grant_type", "authorization_code"),
-                      ];
-                      let client = reqwest::Client::new();
-                      if let Ok(resp) = client.post("https://oauth2.googleapis.com/token").form(&params).send().await {
-                        if let Ok(json) = resp.json::<serde_json::Value>().await {
-                          let access = json.get("access_token").and_then(|v| v.as_str()).unwrap_or("").to_string();
-                          let refresh = json.get("refresh_token").and_then(|v| v.as_str()).unwrap_or("").to_string();
-                          let expires_in = json.get("expires_in").and_then(|v| v.as_u64()).unwrap_or(0);
-                          if !access.is_empty() {
-                            let t = Tokens { access_token: access, refresh_token: refresh, expires_in, created_at: now_secs() };
-                            if let Ok(s) = serde_json::to_string_pretty(&t) {
-                              let _ = std::fs::write(&tokens_file, s);
-                            }
-                          }
-                        }
-                      }
+                    if let Ok(t) = exchange_and_persist(&config_file.parent().unwrap_or_else(|| std::path::Path::new(".")), &code).await {
+                      if let Ok(s) = serde_json::to_string_pretty(&t) { let _ = std::fs::write(&tokens_file, s); }
                     }
                   }
                 });
@@ -296,5 +273,76 @@ mod tests {
     assert!(out.contains("AUTO_UPLOAD=false"));
     assert!(out.contains("# YOUTUBE_ACCESS_TOKEN=acc"));
     assert!(out.contains("# YOUTUBE_REFRESH_TOKEN=ref"));
+  }
+
+  #[test]
+  fn test_read_write_config_in_tmp_dir() {
+    let dir = tempfile::tempdir().unwrap();
+    let cfg = AppConfig { client_id: "cid".into(), client_secret: "sec".into() };
+    write_config_to_dir(dir.path(), &cfg).unwrap();
+    let back = read_config_from_dir(dir.path()).unwrap();
+    assert_eq!(back.client_id, "cid");
+    assert_eq!(back.client_secret, "sec");
+  }
+
+  #[test]
+  fn test_read_write_tokens_in_tmp_dir() {
+    let dir = tempfile::tempdir().unwrap();
+    let t = Tokens { access_token: "a".into(), refresh_token: "r".into(), expires_in: 1, created_at: 0 };
+    write_tokens_to_dir(dir.path(), &t).unwrap();
+    let back = read_tokens_from_dir(dir.path()).unwrap();
+    assert_eq!(back.access_token, "a");
+    assert_eq!(back.refresh_token, "r");
+  }
+
+  #[tokio::test]
+  async fn test_perform_token_exchange_with_mock() {
+    // Mock token endpoint
+    let route = warp::post()
+      .and(warp::path("token"))
+      .and(warp::body::form())
+      .map(|_form: std::collections::HashMap<String, String>| {
+        let body = serde_json::json!({
+          "access_token": "acc_test",
+          "refresh_token": "ref_test",
+          "expires_in": 3600
+        });
+        warp::reply::json(&body)
+      });
+    let (addr, server) = warp::serve(route).bind_ephemeral(([127,0,0,1], 0));
+    tokio::spawn(server);
+    std::env::set_var("OAUTH_TOKEN_URL", format!("http://{}:{}/token", addr.ip(), addr.port()));
+
+    let t = perform_token_exchange("cid", "sec", "code123", "http://127.0.0.1:14321/callback").await.unwrap();
+    assert_eq!(t.access_token, "acc_test");
+    assert_eq!(t.refresh_token, "ref_test");
+    assert_eq!(t.expires_in, 3600);
+  }
+
+  #[tokio::test]
+  async fn test_exchange_and_persist_writes_tokens() {
+    // Mock token endpoint
+    let route = warp::post()
+      .and(warp::path("token"))
+      .and(warp::body::form())
+      .map(|_form: std::collections::HashMap<String, String>| {
+        warp::reply::json(&serde_json::json!({
+          "access_token": "acc_persist",
+          "refresh_token": "ref_persist",
+          "expires_in": 1800
+        }))
+      });
+    let (addr, server) = warp::serve(route).bind_ephemeral(([127,0,0,1], 0));
+    tokio::spawn(server);
+    std::env::set_var("OAUTH_TOKEN_URL", format!("http://{}:{}/token", addr.ip(), addr.port()));
+
+    let dir = tempfile::tempdir().unwrap();
+    let cfg = AppConfig { client_id: "cid".into(), client_secret: "sec".into() };
+    write_config_to_dir(dir.path(), &cfg).unwrap();
+
+    let t = exchange_and_persist(dir.path(), "codeXYZ").await.unwrap();
+    assert_eq!(t.access_token, "acc_persist");
+    let saved = read_tokens_from_dir(dir.path()).unwrap();
+    assert_eq!(saved.refresh_token, "ref_persist");
   }
 }
