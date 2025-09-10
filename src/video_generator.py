@@ -95,13 +95,20 @@ class VideoGenerator:
         
         # Write output
         console.print(f"[cyan]Writing video to {output_path}...[/]")
-        final_video.write_videofile(
-            output_path,
-            fps=self.fps,
-            codec="libx264",
-            audio_codec="aac",
-            logger=None  # Suppress moviepy output
-        )
+        try:
+            final_video.write_videofile(
+                output_path,
+                fps=self.fps,
+                codec="libx264",
+                audio_codec="aac",
+                logger=None,  # Suppress moviepy output
+                verbose=False,
+                temp_audiofile='temp-audio.m4a',
+                remove_temp=True
+            )
+        except Exception as e:
+            console.print(f"[red]Error writing video: {e}[/]")
+            raise
         
         console.print(f"[green]✓ Video created: {output_path}[/]")
         
