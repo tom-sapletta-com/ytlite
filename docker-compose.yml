@@ -1,0 +1,46 @@
+version: '3.8'
+
+services:
+  ytlite:
+    build: .
+    container_name: ytlite-generator
+    volumes:
+      - ./content:/app/content
+      - ./output:/app/output
+      - ./credentials:/app/credentials:ro
+      - ./config:/app/config:ro
+    environment:
+      - YOUTUBE_API_KEY=${YOUTUBE_API_KEY}
+      - EDGE_TTS_VOICE=${EDGE_TTS_VOICE:-pl-PL-MarekNeural}
+      - OUTPUT_QUALITY=${OUTPUT_QUALITY:-720p}
+      - AUTO_UPLOAD=${AUTO_UPLOAD:-false}
+    command: make generate
+    profiles:
+      - generator
+
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "8080:80"
+    volumes:
+      - ./output:/usr/share/nginx/html:ro
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    profiles:
+      - preview
+
+  scheduler:
+    build: .
+    container_name: ytlite-scheduler
+    volumes:
+      - ./content:/app/content
+      - ./output:/app/output
+      - ./credentials:/app/credentials:ro
+      - ./config:/app/config:ro
+    environment:
+      - YOUTUBE_API_KEY=${YOUTUBE_API_KEY}
+      - AUTO_UPLOAD=${AUTO_UPLOAD:-false}
+      - SCHEDULE_TIME=${SCHEDULE_TIME:-09:00}
+    command: python src/scheduler.py
+    profiles:
+      - automation
+    restart: unless-stopped

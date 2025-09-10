@@ -1,0 +1,35 @@
+# YTLite Configuration
+voice: pl-PL-MarekNeural  # Polish male voice (natural sounding)
+# Alternative voices:
+# pl-PL-ZofiaNeural - Polish female
+# en-US-AriaNeural - English female  
+# en-US-GuyNeural - English male
+
+resolution: [1280, 720]  # 720p for faster processing
+fps: 30
+font_size: 48
+style: minimalist
+
+# Auto-upload settings
+auto_upload: false  # Set to true when you're ready
+upload_privacy: unlisted  # public, private, or unlisted
+upload_schedule: "09:00"  # Time to upload daily content
+
+# Shorts settings
+generate_shorts: true
+shorts_duration: 60  # seconds
+
+# Theme colors (hex)
+themes:
+  tech:
+    bg_color: "#1e1e2e"
+    text_color: "#cdd6f4"
+    accent: "#89b4fa"
+  philosophy:
+    bg_color: "#2e2e3e"
+    text_color: "#f5f5f5"
+    accent: "#ffd700"
+  wetware:
+    bg_gradient: ["#667eea", "#764ba2"]
+    text_color: "#ffffff"
+    accent: "#ff6b6b"
