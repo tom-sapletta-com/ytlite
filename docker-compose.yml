@@ -11,6 +11,8 @@ services:
     working_dir: /app
     profiles: ["tauri"]
     command: tail -f /dev/null
+    networks:
+      - ytlite-network
 
   ytlite-base:
     build:
@@ -19,6 +21,8 @@ services:
     image: ytlite:base
     container_name: ytlite-base-build
     profiles: ["build"]
+    networks:
+      - ytlite-network
 
   ytlite:
     build:
@@ -37,6 +41,8 @@ services:
     depends_on:
       - ytlite-base
     profiles: ["app"]
+    networks:
+      - ytlite-network
 
   ytlite-dev:
     image: ytlite:app
@@ -53,6 +59,8 @@ services:
     depends_on:
       - ytlite-base
     profiles: ["dev"]
+    networks:
+      - ytlite-network
 
   nginx:
     image: nginx:alpine
@@ -63,6 +71,8 @@ services:
     ports:
       - "8080:80"
     profiles: ["preview", "dev"]
+    networks:
+      - ytlite-network
 
   scheduler:
     build:
@@ -83,6 +93,8 @@ services:
     depends_on:
       - ytlite-base
     profiles: ["automation"]
+    networks:
+      - ytlite-network
 
   tts-service:
     image: ytlite:app
@@ -98,6 +110,8 @@ services:
     depends_on:
       - ytlite-base
     profiles: ["tts"]
+    networks:
+      - ytlite-network
 
   video-generator:
     image: ytlite:app
@@ -113,6 +127,8 @@ services:
     depends_on:
       - tts-service
     profiles: ["video"]
+    networks:
+      - ytlite-network
 
   uploader:
     image: ytlite:app
@@ -130,6 +146,8 @@ services:
     depends_on:
       - video-generator
     profiles: ["upload"]
+    networks:
+      - ytlite-network
 
 networks:
   ytlite-network:

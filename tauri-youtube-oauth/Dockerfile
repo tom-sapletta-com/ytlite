@@ -1,17 +1,16 @@
 # Use a pre-built Tauri development image to speed up builds
-FROM ivangabriele/docker-tauri:debian-bookworm-20
+FROM ivangabriele/tauri:debian-bookworm-20
 
 # Set up the working directory
 WORKDIR /app
 
-# Install Node.js dependencies (cached layer)
-COPY package*.json ./
-RUN npm install
+# Copy dependency definitions
+COPY package.json package-lock.json ./
 
-# Dependencies will be handled by the first build command inside the container
+# Install dependencies using npm ci for a clean, reproducible build
+RUN npm ci
 
 # Copy the rest of the application source code
-WORKDIR /app
 COPY . .
 
 # Default command to keep the container running

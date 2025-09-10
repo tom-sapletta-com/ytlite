@@ -193,8 +193,6 @@ cython_debug/
 
 # Ruff stuff:
 .ruff_cache/
-package-lock.json
-Cargo.lock
 .idea
 venv
 .env

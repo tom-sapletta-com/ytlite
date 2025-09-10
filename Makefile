@@ -6,6 +6,9 @@ YELLOW := \033[1;33m
 RED := \033[0;31m
 NC := \033[0m # No Color
 
+# ==============================================================================
+# HELP
+# ==============================================================================
 help: ## Show this help message
 	@echo "$(GREEN)🎬 YTLite - YouTube Content Automation$(NC)"
 	@echo "$(YELLOW)Filozofia: Simple > Complex, Consistency > Perfection$(NC)"
@@ -13,10 +16,13 @@ help: ## Show this help message
 	@echo "$(YELLOW)Usage:$(NC)"
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "  $(GREEN)%-20s$(NC) %s\n", $$1, $$2}'
 
-install: ## Install dependencies locally
+# ==============================================================================
+# LOCAL WORKFLOW
+# ==============================================================================
+install: ## Install/update local dependencies
 	bash scripts/install.sh
 
-check-deps: ## Check and install missing dependencies
+check-deps: ## Check and install missing OS dependencies
 	bash scripts/check-deps.sh
 
 generate: ## Generate videos from markdown content
@@ -40,8 +46,8 @@ daily: ## Generate daily content automatically
 docker-build: ## Build all necessary Docker images (app, tauri, etc.)
 	docker-compose --profile app --profile tauri build
 
-docker-up: ## Start all services in the background (app, preview)
-	docker-compose --profile app --profile preview up -d
+docker-up: ## Start all services in the background (app, preview, tauri)
+	docker-compose --profile app --profile preview --profile tauri up -d
 
 docker-down: ## Stop and remove all running containers
 	docker-compose down
@@ -53,25 +59,24 @@ docker-shell: ## Open a shell in the main app container
 	docker-compose exec ytlite-app bash
 
 # --- Tauri Specific Docker Commands ---
-tauri-dev: ## Run Tauri app in dev mode (requires X11 forwarding)
-	docker-compose --profile tauri up -d tauri-dev
-
 tauri-shell: ## Open a shell in the Tauri dev container
-	docker-compose --profile tauri run --rm tauri-dev bash
+	docker-compose exec tauri-dev bash
 
 tauri-build: ## Build the Tauri application inside Docker
-	docker-compose --profile tauri run --rm tauri-dev bash -c "cd src-tauri && cargo build --release"
+	docker-compose exec tauri-dev bash -c "cd src-tauri && cargo build --release"
 
-tauri-test: tauri-test-e2e tauri-test-contract ## Run all Tauri tests
+tauri-test: ## Run all Tauri tests (E2E and contract)
+	make tauri-test-e2e
+	make tauri-test-contract
 
 tauri-check: ## Check Rust code in Tauri container
-	docker-compose --profile tauri run --rm tauri-dev bash -c "cd src-tauri && cargo check"
+	docker-compose exec tauri-dev bash -c "cd src-tauri && cargo check"
 
 tauri-test-e2e: ## Run Tauri E2E tests in Docker
-	docker-compose --profile tauri run --rm tauri-dev npm run test:e2e
+	docker-compose exec tauri-dev npm run test:e2e
 
 tauri-test-contract: ## Run Tauri contract tests in Docker
-	docker-compose --profile tauri run --rm tauri-dev bash -c "cd src-tauri && cargo test"
+	docker-compose exec tauri-dev bash -c "cd src-tauri && cargo test"
 
 # ==============================================================================
 # DEVELOPMENT & MAINTENANCE
