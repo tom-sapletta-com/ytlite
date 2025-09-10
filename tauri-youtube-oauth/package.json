@@ -8,7 +8,11 @@
     "start": "tauri dev",
     "vite-dev": "vite",
     "build": "tauri build",
-    "build:frontend": "vite build"
+    "build:frontend": "vite build",
+    "test": "vitest",
+    "test:unit": "vitest --run",
+    "test:watch": "vitest",
+    "test:ci": "npm run -s test:unit && (cd src-tauri && cargo test)"
   },
   "dependencies": {
     "@tauri-apps/api": "^1.5.3",
@@ -20,6 +24,10 @@
     "@vitejs/plugin-react": "^4.2.1",
     "@types/react": "^18.2.0",
     "@types/react-dom": "^18.2.0",
+    "@testing-library/jest-dom": "^6.4.2",
+    "@testing-library/react": "^14.1.2",
+    "jsdom": "^24.0.0",
+    "vitest": "^1.6.0",
     "typescript": "^5.3.3",
     "vite": "^5.1.0"
   }

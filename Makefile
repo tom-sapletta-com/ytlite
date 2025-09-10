@@ -87,6 +87,9 @@ stats: ## Show project statistics
 clean: ## Clean generated files
 	@bash scripts/clean.sh
 
+validate: ## Validate generated videos with STT and analysis
+	@bash scripts/validate.sh
+
 publish-pypi: ## Publish project to PyPI
 	@bash scripts/publish-pypi.sh
 
