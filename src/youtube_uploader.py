@@ -251,7 +251,7 @@ def cli():
 
 @cli.command()
 @click.option('--batch', is_flag=True, help='Upload all videos in output folder')
-@cli.option('--folder', default='output', help='Folder to upload from')
+@click.option('--folder', default='output', help='Folder to upload from')
 def upload(batch, folder):
     """Upload videos to YouTube"""
     uploader = SimpleYouTubeUploader()

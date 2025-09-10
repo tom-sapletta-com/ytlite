@@ -26,15 +26,17 @@ make preview  # http://localhost:8080
 
 ## Główne funkcje
 
-- **Markdown → Video** w 30 sekund
-- **Auto-Shorts** (60s highlights) 
-- **Free TTS** (edge-tts, wiele głosów)
-- **Proste slajdy** (bez skomplikowanych animacji)
-- **Auto-upload** do YouTube
-- **Dzienny scheduler** (ustaw i zapomnij)
-- **Docker support** (zero instalacji)
+- **Markdown → Video** w 30 sekund → [`src/ytlite.py`](src/ytlite.py)
+- **Auto-Shorts** (60s highlights) → [`create_shorts()`](src/ytlite.py#L180)
+- **Free TTS** (edge-tts, wiele głosów) → [`generate_audio()`](src/ytlite.py#L120)
+- **Proste slajdy** (bez skomplikowanych animacji) → [`create_slides()`](src/ytlite.py#L90)
+- **Auto-upload** do YouTube → [`youtube_uploader.py`](src/youtube_uploader.py)
+- **Dzienny scheduler** (ustaw i zapomnij) → [`scheduler.py`](src/scheduler.py)
+- **Docker support** (zero instalacji) → [`Dockerfile`](Dockerfile) + [`docker-compose.yml`](docker-compose.yml)
 
 ## Format contentu
+
+Przykłady: [`content/episodes/`](content/episodes/)
 
 ```markdown
 ---
@@ -51,6 +53,11 @@ Drugi akapit to drugi slajd.
 Krótko. Konkretnie. Skutecznie.
 ```
 
+### Przykładowe treści:
+- [`welcome.md`](content/episodes/welcome.md) - wprowadzenie do YTLite
+- [`wetware_intro.md`](content/episodes/wetware_intro.md) - temat wetware/cyborgizacji
+- [`philosophy_time.md`](content/episodes/philosophy_time.md) - refleksje filozoficzne
+
 ## Codzienny workflow
 
 ```bash
@@ -63,7 +70,8 @@ make generate
 # Wgraj automatycznie
 make upload
 
-# Gotowe! 
+# Preview
+make preview  # http://localhost:8080
 ```
 
 ## Docker
@@ -81,24 +89,29 @@ make preview  # http://localhost:8080
 
 ## Konfiguracja
 
-1. **YouTube API:**
+### 🔑 Pliki konfiguracyjne:
+- [`.env.example`](.env.example) - zmienne środowiskowe (API keys, ustawienia)
+- [`config.yaml`](config.yaml) - główna konfiguracja (głosy, motywy, jakość)
+- [`Makefile`](Makefile) - komendy automatyzacji
+
+### 1. **YouTube API:**
    - Idź do [Google Cloud Console](https://console.cloud.google.com/)
    - Włącz YouTube Data API v3
    - Pobierz `credentials.json` → `credentials/`
 
-2. **Środowisko:**
+### 2. **Środowisko:**
    ```bash
    cp .env.example .env
    # Wypełnij swoje dane
    ```
 
-3. **Głosy TTS:**
+### 3. **Głosy TTS:**
    ```yaml
    # config.yaml
    voice: pl-PL-MarekNeural  # Mężczyzna PL
    # voice: pl-PL-ZofiaNeural  # Kobieta PL
    # voice: en-US-AriaNeural   # Kobieta EN
-   ```
+```
 
 ## Motywy
 
@@ -124,16 +137,16 @@ make stats
 
 ## Komendy
 
-| Komenda | Opis |
-|---------|------|
-| `make help` | Pokaż wszystkie komendy |
-| `make generate` | Wygeneruj filmy z markdown |
-| `make shorts` | Stwórz Shorts z istniejących filmów |
-| `make upload` | Wgraj na YouTube |
-| `make publish` | Pełen pipeline (bez upload) |
-| `make daily` | Generuj daily content |
-| `make preview` | Preview na localhost:8080 |
-| `make clean` | Wyczyść pliki |
+| Komenda | Opis | Kod |
+|---------|------|-----|
+| `make help` | Pokaż wszystkie komendy | [Makefile:9](Makefile#L9) |
+| `make generate` | Wygeneruj filmy z markdown | [Makefile:17](Makefile#L17) |
+| `make shorts` | Stwórz Shorts z istniejących filmów | [Makefile:25](Makefile#L25) |
+| `make upload` | Wgraj na YouTube | [Makefile:30](Makefile#L30) |
+| `make publish` | Pełen pipeline (bez upload) | [Makefile:35](Makefile#L35) |
+| `make daily` | Generuj daily content | [Makefile:40](Makefile#L40) |
+| `make preview` | Preview na localhost:8080 | [Makefile:70](Makefile#L70) |
+| `make clean` | Wyczyść pliki | [Makefile:100](Makefile#L100) |
 
 ## Dlaczego YTLite?
 
