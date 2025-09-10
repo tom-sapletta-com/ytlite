@@ -1,0 +1,35 @@
+# YTLite Base Image - Heavy system dependencies
+FROM python:3.11-slim
+
+LABEL maintainer="tom@sapletta.com"
+LABEL description="YTLite base image with system dependencies"
+
+# Install system dependencies (ffmpeg, audio tools)
+RUN apt-get update && apt-get install -y \
+    ffmpeg \
+    sox \
+    espeak-ng \
+    make \
+    git \
+    wget \
+    curl \
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean
+
+# Create app user for security
+RUN useradd -m -u 1000 ytlite
+
+# Set working directory
+WORKDIR /app
+RUN chown ytlite:ytlite /app
+
+USER ytlite
+
+# Cache common Python packages that don't change often
+RUN pip install --user --no-cache-dir \
+    click \
+    rich \
+    pyyaml \
+    python-dotenv
+
+CMD ["bash"]

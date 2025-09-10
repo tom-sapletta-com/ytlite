@@ -81,7 +81,7 @@ async fn set_config(app: AppHandle, client_id: String, client_secret: String) ->
 #[tauri::command]
 async fn start_oauth(app: AppHandle) -> Result<(), String> {
   let cfg = read_config(&app).ok_or("Brak konfiguracji klienta (Client ID/Secret)".to_string())?;
-  let redirect = "http://127.0.0.1:1420/callback";
+  let redirect = "http://127.0.0.1:14321/callback";
   let scope = "https://www.googleapis.com/auth/youtube.readonly";
   let url = format!(
     "https://accounts.google.com/o/oauth2/v2/auth?client_id={}&response_type=code&redirect_uri={}&access_type=offline&prompt=consent&scope={}",
@@ -104,7 +104,7 @@ async fn start_oauth(app: AppHandle) -> Result<(), String> {
 #[tauri::command]
 async fn exchange_code(app: AppHandle, code: String) -> Result<Tokens, String> {
   let cfg = read_config(&app).ok_or("Brak konfiguracji klienta".to_string())?;
-  let redirect = "http://127.0.0.1:1420/callback";
+  let redirect = "http://127.0.0.1:14321/callback";
   let params = [
     ("code", code.as_str()),
     ("client_id", cfg.client_id.as_str()),
@@ -209,6 +209,60 @@ async fn generate_env(app: AppHandle) -> Result<String, String> {
 }
 
 fn main() {
+  // Spawn a lightweight OAuth callback server on 127.0.0.1:14321/callback
+  {
+    let cfg_dir = tauri::api::path::app_config_dir(&tauri::Config::default()).unwrap_or_else(|| std::env::temp_dir());
+    let tokens_file = cfg_dir.join("tokens.json");
+    let config_file = cfg_dir.join("oauth_config.json");
+    let _ = std::fs::create_dir_all(&cfg_dir);
+
+    std::thread::spawn(move || {
+      let rt = tokio::runtime::Builder::new_multi_thread().enable_all().build().expect("tokio runtime");
+      rt.block_on(async move {
+        let route = warp::path("callback")
+          .and(warp::get())
+          .and(warp::query::<std::collections::HashMap<String, String>>())
+          .map(move |params: std::collections::HashMap<String, String>| {
+            let code = params.get("code").cloned();
+            let tokens_file = tokens_file.clone();
+            let config_file = config_file.clone();
+            tokio::spawn(async move {
+              if let Some(code) = code {
+                let cfg_text = std::fs::read_to_string(&config_file).unwrap_or_default();
+                let cfg: Option<AppConfig> = serde_json::from_str(&cfg_text).ok();
+                if let Some(cfg) = cfg {
+                  let redirect = "http://127.0.0.1:14321/callback";
+                  let params = [
+                    ("code", code.as_str()),
+                    ("client_id", cfg.client_id.as_str()),
+                    ("client_secret", cfg.client_secret.as_str()),
+                    ("redirect_uri", redirect),
+                    ("grant_type", "authorization_code"),
+                  ];
+                  let client = reqwest::Client::new();
+                  if let Ok(resp) = client.post("https://oauth2.googleapis.com/token").form(&params).send().await {
+                    if let Ok(json) = resp.json::<serde_json::Value>().await {
+                      let access = json.get("access_token").and_then(|v| v.as_str()).unwrap_or("").to_string();
+                      let refresh = json.get("refresh_token").and_then(|v| v.as_str()).unwrap_or("").to_string();
+                      let expires_in = json.get("expires_in").and_then(|v| v.as_u64()).unwrap_or(0);
+                      if !access.is_empty() {
+                        let t = Tokens { access_token: access, refresh_token: refresh, expires_in, created_at: now_secs() };
+                        if let Ok(s) = serde_json::to_string_pretty(&t) {
+                          let _ = std::fs::write(&tokens_file, s);
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            });
+            warp::reply::html("<html><body><h2>Autoryzacja zakończona. Możesz zamknąć to okno.</h2></body></html>")
+          });
+        warp::serve(route).run(([127, 0, 0, 1], 14321)).await;
+      });
+    });
+  }
+
   tauri::Builder::default()
     .invoke_handler(tauri::generate_handler![
       get_config,

@@ -48,14 +48,36 @@ daily: ## Generate daily content automatically
 	@echo "$(GREEN)✅ Daily content ready$(NC)"
 
 # Docker commands
-docker-build: ## Build Docker image
-	docker build -t ytlite:latest .
+docker-build-base: ## Build base Docker image (heavy dependencies)
+	@echo "$(YELLOW)🐳 Building base Docker image...$(NC)"
+	docker build -f Dockerfile.base -t ytlite:base .
+	@echo "$(GREEN)✅ Base Docker image built (cached for future builds)$(NC)"
 
-docker-run: docker-build ## Run generation in Docker
-	docker-compose --profile generator up ytlite
+docker-build-app: ## Build app Docker image (light, fast rebuilds)
+	@echo "$(YELLOW)🐳 Building app Docker image...$(NC)"
+	docker build -f Dockerfile.app -t ytlite:app .
+	@echo "$(GREEN)✅ App Docker image built$(NC)"
 
-docker-shell: ## Shell into container for debugging
-	docker run -it --rm -v $(PWD):/app ytlite:latest bash
+docker-build: docker-build-base docker-build-app ## Build both Docker images
+
+docker-build-fast: ## Build only app image (assumes base exists)
+	@echo "$(YELLOW)⚡ Fast Docker build (app only)...$(NC)"
+	docker build -f Dockerfile.app -t ytlite:app .
+	@echo "$(GREEN)✅ Fast build complete$(NC)"
+
+docker-run: ## Run with Docker Compose
+	@echo "$(YELLOW)🐳 Starting Docker services...$(NC)"
+	docker-compose up --build -d
+	@echo "$(GREEN)✅ Docker services started$(NC)"
+
+docker-dev: ## Run development environment with live reload
+	@echo "$(YELLOW)🔧 Starting development environment...$(NC)"
+	docker-compose up ytlite-dev nginx -d
+	@echo "$(GREEN)✅ Development environment started$(NC)"
+
+docker-shell: ## Open shell in Docker container
+	@echo "$(YELLOW)🐳 Opening Docker shell...$(NC)"
+	docker run -it --rm -v $(PWD):/app ytlite:app bash
 
 # Preview and development
 preview: ## Preview output locally on http://localhost:8080
