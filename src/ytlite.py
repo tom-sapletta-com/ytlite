@@ -16,6 +16,13 @@ import click
 import edge_tts
 import frontmatter
 import yaml
+from PIL import Image, ImageDraw, ImageFont
+from rich.console import Console
+from rich.progress import track
+from dotenv import load_dotenv
+
+console = Console()
+
 try:
     from moviepy.editor import VideoFileClip, TextClip, CompositeVideoClip, ImageClip, concatenate_videoclips, AudioFileClip
 except ImportError:
@@ -23,15 +30,9 @@ except ImportError:
     import subprocess
     subprocess.check_call([sys.executable, "-m", "pip", "install", "moviepy"])
     from moviepy.editor import VideoFileClip, TextClip, CompositeVideoClip, ImageClip, concatenate_videoclips, AudioFileClip
-from PIL import Image, ImageDraw, ImageFont
-from rich.console import Console
-from rich.progress import track
-from dotenv import load_dotenv
 
 # Load environment variables
 load_dotenv()
-
-console = Console()
 
 class YTLite:
     """Minimalist YouTube content generator"""

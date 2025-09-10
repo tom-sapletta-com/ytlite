@@ -16,6 +16,9 @@ help: ## Show this help message
 install: ## Install dependencies locally
 	@bash scripts/install.sh
 
+check-deps: ## Check and install missing dependencies
+	@bash scripts/check-deps.sh
+
 generate: ## Generate videos from markdown content
 	@bash scripts/generate.sh
 
