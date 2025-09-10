@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import { invoke } from '@tauri-apps/api/tauri'
+import { invoke } from './tauriInvoke'
 
 interface Tokens {
   access_token: string
