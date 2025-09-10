@@ -1,4 +1,7 @@
-# YTLite - Minimalistyczny Pipeline YouTube 
+# YTLite - Minimalistyczny Pipeline YouTube 🎬
+
+[![PyPI version](https://badge.fury.io/py/ytlite.svg)](https://badge.fury.io/py/ytlite)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 **Filozofia:** Simple > Complex, Consistency > Perfection
 

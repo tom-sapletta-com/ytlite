@@ -1,0 +1,1 @@
+Twoja genialna myśl
