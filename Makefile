@@ -84,6 +84,9 @@ stats: ## Show project statistics
 clean: ## Clean generated files
 	@bash scripts/clean.sh
 
+publish-pypi: ## Publish project to PyPI
+	@bash scripts/publish-pypi.sh
+
 # Quick content creation
 quick: ## Quick content from stdin (echo "content" | make quick)
 	@bash scripts/quick.sh
