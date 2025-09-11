@@ -9,6 +9,10 @@ ROOT = Path("/")
 class FakeUploader:
     def upload_video(self, video_path, title, description, privacy_status):
         return "fake_video_id"
+    # Add dummy youtube attribute to mimic SimpleYouTubeUploader
+    youtube = None
+    def get_uploadable_videos(self):
+        return []
 
 
 def test_upload_project_uses_env_and_privacy(monkeypatch, tmp_path):
@@ -24,6 +28,7 @@ def test_upload_project_uses_env_and_privacy(monkeypatch, tmp_path):
     fake = FakeUploader()
     monkeypatch.setattr(yu, "SimpleYouTubeUploader", lambda *a, **k: fake)
     
-    # Directly invoke the function instead of using CliRunner
-    result = yu.upload_project(project=project, privacy="public")
-    assert result == 0, "Command failed"
+    runner = CliRunner()
+    result = runner.invoke(yu.cli, ["upload-project", "--project", project, "--privacy", "public"], catch_exceptions=False)
+    print("Command Output:", result.output)
+    assert result.exit_code == 0, f"Command failed with exit code {result.exit_code}: {result.output}"

@@ -1,4 +1,4 @@
-.PHONY: help install clean generate shorts upload upload-project publish docker-build docker-run preview daily test test-e2e gui logs logs-follow
+.PHONY: help install clean generate shorts upload upload-project publish docker-build docker-run preview daily test test-e2e gui logs logs-follow wordpress-test example-project
 
 # Colors for output
 GREEN := \033[0;32m
