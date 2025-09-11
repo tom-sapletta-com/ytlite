@@ -250,10 +250,10 @@ class YTLite:
         description_body = "\n\n".join(paragraphs) if paragraphs else metadata.get('title', base_name)
         (project_dir / "description.md").write_text("\n".join(fm_lines) + description_body + "\n", encoding="utf-8")
 
-        # Create a simple index.md to navigate assets
+        # Create SVG single-file package
         svg_path = build_svg(project_dir, metadata, paragraphs, video_path, audio_path, thumbnail_path)
 
-        # Create a simple index.md to navigate assets
+        # Create a simple index.md to navigate assets (if not SVG-only)
         index_md = f"""
 # {metadata.get('title', base_name)}
 
@@ -265,6 +265,21 @@ class YTLite:
 - SVG (single-file package): [{svg_path.name}]({svg_path.name})
 """
         (project_dir / "index.md").write_text(index_md.strip() + "\n", encoding="utf-8")
+
+        # Optional: SVG_ONLY mode - keep only the SVG artifact in the project dir
+        try:
+            if os.getenv("SVG_ONLY") == "1":
+                for fname in ["video.mp4", "audio.mp3", "thumbnail.jpg", "short.mp4", "description.md", "index.md", "source.md"]:
+                    fp = project_dir / fname
+                    if fp.exists():
+                        try:
+                            os.remove(fp)
+                        except Exception:
+                            pass
+                # Write a minimal README pointing to the SVG
+                (project_dir / "README.md").write_text(f"# {metadata.get('title', base_name)}\n\n- SVG: [{svg_path.name}]({svg_path.name})\n", encoding="utf-8")
+        except Exception:
+            pass
 
     def build_output_index(self):
         """Build output/README.md summary with links and thumbnails to projects."""

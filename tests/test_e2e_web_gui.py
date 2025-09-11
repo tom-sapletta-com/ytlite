@@ -36,6 +36,7 @@ def test_generate_valid_markdown_e2e(tmp_path):
     assert (pdir / "video.mp4").exists()
     assert (pdir / "audio.mp3").exists()
     assert (pdir / "thumbnail.jpg").exists()
+    assert any(pdir.glob('*.svg'))
     # Files served
     vresp = client.get(data["urls"]["video"])  # /files/projects/<proj>/video.mp4
     assert vresp.status_code in (200, 206)
@@ -65,6 +66,7 @@ Treść po złym froncie
     pdir = root / "output" / "projects" / project
     assert (pdir / "video.mp4").exists()
     assert (pdir / "thumbnail.jpg").exists()
+    assert any(pdir.glob('*.svg'))
     # Access project index via files route
     iresp = client.get(data["urls"]["index"])
     assert iresp.status_code == 200

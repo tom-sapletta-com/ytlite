@@ -12,7 +12,7 @@ import base64
 import json
 from pathlib import Path
 from typing import Optional
-from datetime import datetime
+from datetime import datetime, timezone
 
 
 def _b64_data_uri(path: Path, mime: str) -> str:
@@ -41,10 +41,17 @@ def build_svg(project_dir: str | Path, metadata: dict, paragraphs: list,
     if audio_path and Path(audio_path).exists():
         audio_uri = _b64_data_uri(Path(audio_path), "audio/mpeg")
 
+    # Convert date objects to strings for JSON serialization
+    date_val = metadata.get("date")
+    if hasattr(date_val, 'isoformat'):
+        date_val = date_val.isoformat()
+    elif date_val:
+        date_val = str(date_val)
+
     meta = {
         "name": name,
         "title": metadata.get("title", name),
-        "date": metadata.get("date"),
+        "date": date_val,
         "theme": metadata.get("theme"),
         "tags": metadata.get("tags", []),
         "voice": metadata.get("voice"),
@@ -52,7 +59,7 @@ def build_svg(project_dir: str | Path, metadata: dict, paragraphs: list,
         "font_size": metadata.get("font_size"),
         "lang": metadata.get("lang"),
         "paragraphs": paragraphs,
-        "created_at": datetime.utcnow().isoformat() + "Z",
+        "created_at": datetime.now(timezone.utc).isoformat(),
         "media": {
             "video_mp4": video_uri,
             "audio_mp3": audio_uri,

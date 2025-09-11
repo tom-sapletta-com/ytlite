@@ -28,6 +28,7 @@ from wordpress_publisher import WordPressPublisher
 from storage_nextcloud import NextcloudClient
 from logging_setup import get_logger
 from progress import load_progress
+from svg_packager import parse_svg_meta, update_svg_media
 
 console = Console()
 app = Flask(__name__)
@@ -380,6 +381,61 @@ def api_progress():
         return jsonify({}), 400
     prog = load_progress(project, OUTPUT_DIR)
     return jsonify(prog or {})
+
+@app.route('/api/projects')
+def api_projects():
+    root = OUTPUT_DIR / 'projects'
+    items = []
+    for p in sorted(root.glob('*/')):
+        name = p.name
+        svg = next(p.glob('*.svg'), None)
+        items.append({"name": name, "svg": svg.name if svg else None})
+    return jsonify({"projects": items})
+
+@app.route('/api/svg_meta')
+def api_svg_meta():
+    project = request.args.get('project', '').strip()
+    if not project:
+        return jsonify({}), 400
+    pdir = OUTPUT_DIR / 'projects' / project
+    svg = next(pdir.glob('*.svg'), None)
+    if not svg:
+        return jsonify({}), 404
+    meta = parse_svg_meta(svg)
+    return jsonify(meta or {})
+
+@app.route('/api/svg_update', methods=['POST'])
+def api_svg_update():
+    data = request.get_json(silent=True) or {}
+    project = data.get('project', '').strip()
+    if not project:
+        return jsonify({'message': 'Missing project'}), 400
+    pdir = OUTPUT_DIR / 'projects' / project
+    svg = next(pdir.glob('*.svg'), None)
+    if not svg:
+        return jsonify({'message': 'SVG not found'}), 404
+    # Update media from current files if requested
+    if data.get('refresh_media'):
+        update_svg_media(svg, str(pdir / 'video.mp4'), str(pdir / 'audio.mp3'), str(pdir / 'thumbnail.jpg'))
+    # Update JSON metadata fields partially if provided
+    meta = parse_svg_meta(svg) or {}
+    patch = data.get('metadata') or {}
+    if patch:
+        for k, v in patch.items():
+            if k == 'media':
+                meta.setdefault('media', {}).update(v or {})
+            else:
+                meta[k] = v
+        # write back by injecting new JSON
+        import re, json as _json
+        txt = svg.read_text(encoding='utf-8')
+        m = re.search(r"<script type=\"application/json\">(.*?)</script>", txt, flags=re.S)
+        if not m:
+            return jsonify({'message': 'SVG meta block missing'}), 500
+        new_json = _json.dumps(meta, ensure_ascii=False).replace('<', '&lt;')
+        new_txt = txt[:m.start(1)] + new_json + txt[m.end(1):]
+        svg.write_text(new_txt, encoding='utf-8')
+    return jsonify({'ok': True, 'svg': svg.name})
 
 
 if __name__ == '__main__':
