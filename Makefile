@@ -128,6 +128,17 @@ quick: ## Quick content from stdin (echo "content" | make quick)
 gui: ## Run Web GUI (Flask) on http://localhost:5000
 	@bash scripts/gui.sh
 
+stop: ## Stop all running servers and processes
+	@echo "$(YELLOW)Stopping all servers and processes...$(NC)"
+	@pkill -f "python3.*web_gui" 2>/dev/null || true
+	@pkill -f "python3.*minimal_web_gui" 2>/dev/null || true
+	@pkill -f "python3.*simple_test_server" 2>/dev/null || true
+	@pkill -f "python3 -m http.server" 2>/dev/null || true
+	@pkill -f "python3.*-c.*Flask" 2>/dev/null || true
+	@lsof -ti:5000 | xargs kill -9 2>/dev/null || true
+	@lsof -ti:8080 | xargs kill -9 2>/dev/null || true
+	@echo "$(GREEN)✅ All servers stopped$(NC)"
+
 logs: ## Show last 200 lines of logs/ytlite.log
 	@tail -n 200 logs/ytlite.log || echo "No logs yet"
 
