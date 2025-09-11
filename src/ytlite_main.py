@@ -109,8 +109,12 @@ class YTLite:
             if self.config.get("generate_shorts", True):
                 console.print("Step 6: Generating shorts...")
                 shorts_path = self.output_dir / "shorts" / f"{base_name}_short.mp4"
-                self.video_generator.create_shorts(str(video_path), str(shorts_path))
-                console.print("Step 6: Done.")
+                try:
+                    self.video_generator.create_shorts(str(video_path), str(shorts_path))
+                    console.print("Step 6: Done.")
+                except Exception as e:
+                    console.print(f"[yellow]Warning: Failed to generate shorts: {e}[/]")
+                    shorts_path = None
             else:
                 shorts_path = None
 
@@ -133,61 +137,6 @@ class YTLite:
             traceback.print_exc()
             raise
 
-@click.group()
-def cli():
-    """YTLite - Minimalist YouTube Content Generator"""
-    pass
-
-@cli.command()
-@click.argument('markdown_file', type=click.Path(exists=True))
-def generate(markdown_file):
-    """Generate video from markdown file"""
-    # Check dependencies first
-    verify_dependencies()
-    
-    # Generate video
-    ytlite = YTLite()
-    ytlite.generate_video(markdown_file)
-
-@cli.command()
-def check():
-    """Check and install dependencies"""
-    verify_dependencies()
-    console.print("[green]✓ System ready[/]")
-
-@cli.command()
-@click.argument('directory', type=click.Path(exists=True), default='content/episodes')
-def batch(directory):
-    """Generate videos for all markdown files in directory"""
-    verify_dependencies()
-    
-    ytlite = YTLite()
-    md_files = list(Path(directory).glob("*.md"))
-    
-    console.print(f"[cyan]Found {len(md_files)} markdown files[/]")
-    
-    failures = 0
-    for md_file in md_files:
-        try:
-            ytlite.generate_video(str(md_file))
-        except Exception as e:
-            console.print(f"[bold red]Error processing {md_file}: {e}[/bold red]")
-            import traceback
-            traceback.print_exc()
-            failures += 1
-            continue
-    
-    # Build index summary after batch
-    try:
-        ytlite.build_output_index()
-    except Exception as e:
-        console.print(f"[yellow]Warning: Failed to build output index: {e}[/]")
-
-    if failures > 0:
-        console.print(f"[bold red]❌ Finished with {failures} errors.[/bold red]")
-        sys.exit(1)
-
-@@
     def package_project(self, base_name: str, metadata: dict, paragraphs: list, markdown_path: str,
                         audio_path: str, video_path: str, thumbnail_path: str, shorts_path: str | None = None):
         """Create per-project folder with all assets and a description markdown."""
@@ -284,6 +233,60 @@ def batch(directory):
             lines.append("")
 
         (self.output_dir / "README.md").write_text("\n".join(lines).strip() + "\n", encoding="utf-8")
+
+@click.group()
+def cli():
+    """YTLite - Minimalist YouTube Content Generator"""
+    pass
+
+@cli.command()
+@click.argument('markdown_file', type=click.Path(exists=True))
+def generate(markdown_file):
+    """Generate video from markdown file"""
+    # Check dependencies first
+    verify_dependencies()
+    
+    # Generate video
+    ytlite = YTLite()
+    ytlite.generate_video(markdown_file)
+
+@cli.command()
+def check():
+    """Check and install dependencies"""
+    verify_dependencies()
+    console.print("[green]✓ System ready[/]")
+
+@cli.command()
+@click.argument('directory', type=click.Path(exists=True), default='content/episodes')
+def batch(directory):
+    """Generate videos for all markdown files in directory"""
+    verify_dependencies()
+    
+    ytlite = YTLite()
+    md_files = list(Path(directory).glob("*.md"))
+    
+    console.print(f"[cyan]Found {len(md_files)} markdown files[/]")
+    
+    failures = 0
+    for md_file in md_files:
+        try:
+            ytlite.generate_video(str(md_file))
+        except Exception as e:
+            console.print(f"[bold red]Error processing {md_file}: {e}[/bold red]")
+            import traceback
+            traceback.print_exc()
+            failures += 1
+            continue
+    
+    # Build index summary after batch
+    try:
+        ytlite.build_output_index()
+    except Exception as e:
+        console.print(f"[yellow]Warning: Failed to build output index: {e}[/]")
+
+    if failures > 0:
+        console.print(f"[bold red]❌ Finished with {failures} errors.[/bold red]")
+        sys.exit(1)
 
 if __name__ == "__main__":
     try:

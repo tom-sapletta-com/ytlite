@@ -1,3 +1,18 @@
+Dodaj mozliwosc uzywania GUI w przegaldarce do wygenerowania w czasie rzeczywistym zopopgodladem jednego projektu
+na podstawie pliku markdown z danymi .env 
+pozowl na tworzenie roznych proejtkow na ropzne konta youtube, gdzie
+dane wrazliwe sa przechopwywane w .env dla danego projektu w danym folderze
+
+dodaj publikacje na wordpress
+pobieraj z poprzez integracje ze storages jak nextclo
+ał make validate-app i make validate-data i streścił wynik i tworzyl raporty dla kazdego uruchomienia aplikacji w folderze pprojektu
+
+
+
+Czy wszystkie ponisze dane zostay wuwzglednione?  jesli tak to usun
+
+
+
 korzystając z aktualnej dokumentacji i plików stworz i uruhcom projekt,
 podam wszystkie niezbędne dane w konfiguracji .env do api, itd
 - [text](ytlite-channel-scripts.py)

@@ -104,6 +104,14 @@ validate: ## Validate generated videos with STT and analysis, and check dependen
 	bash scripts/check-deps.sh
 	bash scripts/validate.sh
 
+# Lightweight app smoke test: deps + generate sample + verify packaging
+validate-app: ## Validate application health (deps + smoke generate + project packaging)
+	bash scripts/validate-app.sh
+
+# Lightweight data integrity validation of output/projects/
+validate-data: ## Validate generated data integrity (projects folders and required files)
+	bash scripts/validate-data.sh
+
 publish-pypi: ## Publish project to PyPI
 	@bash scripts/publish-pypi.sh
 

@@ -2,8 +2,6 @@
   "status": "failed",
   "failedTests": [
     "a30a6eba6312f6b87ea5-7acb9eb4d29a486d08b7",
-    "959ef144cd95482078c8-047b8bd51c7429b8be9b",
-    "959ef144cd95482078c8-9c98fa752dd4acc09d05",
     "959ef144cd95482078c8-b6bda58febe446c9960e",
     "4f3b0ba727013e05bcc4-608788bcac1561af79bc"
   ]
