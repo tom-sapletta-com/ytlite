@@ -9,8 +9,10 @@ from pathlib import Path
 from typing import List, Optional
 from PIL import Image, ImageDraw, ImageFont
 from rich.console import Console
+from logging_setup import get_logger
 
 console = Console()
+logger = get_logger("video")
 
 # Import MoviePy using explicit submodules for broad compatibility
 try:
@@ -82,12 +84,14 @@ class VideoGenerator:
         # Save temporary image
         temp_path = f"/tmp/slide_{hash(text)}.png"
         img.save(temp_path)
+        logger.info("Slide created", extra={"path": temp_path, "len": len(text)})
         return temp_path
     
     def create_video_from_slides(self, slides: List[str], audio_path: str, output_path: str):
         """Create video from slide images and audio"""
         
         console.print(f"[cyan]Creating video from {len(slides)} slides...[/]")
+        logger.info("Create video start", extra={"slides": len(slides), "audio": audio_path, "output": output_path})
         
         # Load audio to get duration
         audio = AudioFileClip(audio_path)
@@ -121,9 +125,11 @@ class VideoGenerator:
             )
         except Exception as e:
             console.print(f"[red]Error writing video: {e}[/]")
+            logger.error("write_videofile failed", extra={"error": str(e)})
             raise
         
         console.print(f"[green]✓ Video created: {output_path}[/]")
+        logger.info("Video created", extra={"output": output_path})
         
         # Cleanup
         for slide_path in slides:
@@ -185,6 +191,7 @@ class VideoGenerator:
     def create_thumbnail(self, video_path: str, output_path: str):
         """Create a thumbnail image from a representative video frame"""
         console.print(f"[cyan]Creating thumbnail for {video_path}...[/]")
+        logger.info("Create thumbnail start", extra={"video": video_path, "output": output_path})
         clip = VideoFileClip(video_path)
         # Take frame from 1/3rd of the video or at 0.5s if too short
         ts = max(0.5, min(clip.duration - 0.05, clip.duration / 3))
@@ -193,3 +200,4 @@ class VideoGenerator:
         Path(output_path).parent.mkdir(parents=True, exist_ok=True)
         img.save(output_path, format='JPEG', quality=90)
         console.print(f"[green]✓ Thumbnail created: {output_path}[/]")
+        logger.info("Thumbnail created", extra={"output": output_path})

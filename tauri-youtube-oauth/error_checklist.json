@@ -1,0 +1,63 @@
+{
+  "checklist": [
+    {
+      "id": "CHECK_001",
+      "description": "Check if Tauri app builds successfully",
+      "command": "cd /app/src-tauri && cargo build",
+      "expected_output": "Finished `dev` profile",
+      "error_message": "Build failed. Check for API mismatches or missing dependencies.",
+      "log_file": "/app/logs/build_log.txt"
+    },
+    {
+      "id": "CHECK_002",
+      "description": "Check if Vite development server starts",
+      "command": "cd /app && npm run vite-dev -- --port=1431",
+      "expected_output": "Vite server running",
+      "error_message": "Vite server failed to start. Check for port conflicts or missing dependencies.",
+      "log_file": "/app/logs/vite_log.txt"
+    },
+    {
+      "id": "CHECK_003",
+      "description": "Check if icon file exists and is valid",
+      "command": "file /app/src-tauri/icons/icon.png",
+      "expected_output": "PNG image data",
+      "error_message": "Icon file missing or invalid. Create a valid RGBA PNG file.",
+      "log_file": "/app/logs/icon_check_log.txt"
+    },
+    {
+      "id": "CHECK_004",
+      "description": "Check for port conflicts on 1431",
+      "command": "netstat -tuln | grep 1431",
+      "expected_output": "",
+      "error_message": "Port 1431 is in use. Terminate conflicting process or use a different port.",
+      "log_file": "/app/logs/port_conflict_log.txt"
+    },
+    {
+      "id": "CHECK_005",
+      "description": "Check Tauri CLI version compatibility",
+      "command": "npm list @tauri-apps/cli",
+      "expected_output": "1.5.0 or compatible",
+      "error_message": "Tauri CLI version mismatch. Update to a compatible version.",
+      "log_file": "/app/logs/tauri_cli_version_log.txt"
+    },
+    {
+      "id": "CHECK_006",
+      "description": "Check if dist directory exists and is populated",
+      "command": "ls -A /app/dist | wc -l",
+      "expected_output": "greater than 0",
+      "error_message": "Dist directory is empty or missing. Run frontend build.",
+      "log_file": "/app/logs/dist_check_log.txt"
+    },
+    {
+      "id": "CHECK_007",
+      "description": "Check for permission issues",
+      "command": "ls -ld /app /app/src-tauri /app/dist | grep -v 'drwxr-xr-x'",
+      "expected_output": "",
+      "error_message": "Permission issues detected. Adjust ownership or permissions.",
+      "log_file": "/app/logs/permissions_log.txt"
+    }
+  ],
+  "log_directory": "/app/logs",
+  "timestamp": "2025-09-11T19:30:37+02:00",
+  "purpose": "This JSON checklist is designed for automated error detection and logging for the Tauri YouTube OAuth app setup. It can be used by an LLM to diagnose issues and suggest solutions."
+}

@@ -1,4 +1,4 @@
-.PHONY: help install clean generate shorts upload upload-project publish docker-build docker-run preview daily test gui
+.PHONY: help install clean generate shorts upload upload-project publish docker-build docker-run preview daily test test-e2e gui logs logs-follow
 
 # Colors for output
 GREEN := \033[0;32m
@@ -97,6 +97,9 @@ automation: ## Start automation scheduler (local)
 test: ## Run local Python tests
 	bash scripts/test.sh
 
+test-e2e: ## Run E2E pytest suite quietly
+	pytest -q
+
 stats: ## Show project statistics
 	@bash scripts/stats.sh
 
@@ -124,3 +127,9 @@ quick: ## Quick content from stdin (echo "content" | make quick)
 
 gui: ## Run Web GUI (Flask) on http://localhost:5000
 	@bash scripts/gui.sh
+
+logs: ## Show last 200 lines of logs/ytlite.log
+	@tail -n 200 logs/ytlite.log || echo "No logs yet"
+
+logs-follow: ## Follow logs/ytlite.log
+	@tail -f logs/ytlite.log || echo "No logs yet"

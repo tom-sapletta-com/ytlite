@@ -159,7 +159,9 @@ def files(subpath: str):
 def api_generate():
     try:
         logger.info("POST /api/generate start")
-        verify_dependencies()
+        # Skip dependency verification in FAST_TEST mode to keep tests fast/deterministic
+        if os.getenv("YTLITE_FAST_TEST") != "1":
+            verify_dependencies()
         project = request.form.get('project') or (request.json and request.json.get('project'))
         markdown = request.form.get('markdown') or (request.json and request.json.get('markdown'))
         if not project:
