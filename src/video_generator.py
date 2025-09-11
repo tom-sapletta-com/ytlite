@@ -20,9 +20,11 @@ try:
 except ImportError:
     console.print("[yellow]Warning: moviepy.editor not found, trying alternative imports...[/]")
     try:
-        from moviepy.video.VideoClip import VideoFileClip, ImageClip, TextClip, CompositeVideoClip
+        from moviepy.video.io.VideoFileClip import VideoFileClip
+        from moviepy.video.VideoClip import ImageClip, TextClip
+        from moviepy.video.compositing.CompositeVideoClip import CompositeVideoClip
         from moviepy.video.compositing.concatenate import concatenate_videoclips
-        from moviepy.audio.AudioClip import AudioFileClip
+        from moviepy.audio.io.AudioFileClip import AudioFileClip
     except ImportError as e:
         console.print(f"[red]Error: Failed to import moviepy components: {e}[/]")
         logger.error("MoviePy import failed", extra={"error": str(e)})
@@ -180,8 +182,7 @@ class VideoGenerator:
                 fps=self.fps,
                 codec="libx264",
                 audio_codec="aac",
-                logger=None,  # Suppress moviepy output
-                verbose=False,
+                logger=None,  
                 temp_audiofile='temp-audio.m4a',
                 remove_temp=True
             )
