@@ -41,6 +41,10 @@
       "svg": null
     },
     {
+      "name": "test_interactive",
+      "svg": "test_interactive.svg"
+    },
+    {
       "name": "test_project",
       "svg": "test_project.svg"
     },
