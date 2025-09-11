@@ -133,3 +133,21 @@ logs: ## Show last 200 lines of logs/ytlite.log
 
 logs-follow: ## Follow logs/ytlite.log
 	@tail -f logs/ytlite.log || echo "No logs yet"
+
+# New targets for validation
+validate-app-report:
+	@echo "Validating ytlite application setup and dependencies..."
+	@python3 -m src.validator
+	@echo "App validation complete. Check reports in the 'reports' directory."
+
+validate-data-report:
+	@echo "Validating ytlite data integrity..."
+	@python3 -m src.validator
+	@echo "Data validation complete. Check reports in the 'reports' directory."
+
+# Help target to show available commands
+help:
+	@echo "Available commands:"
+	@echo "  make validate-app-report    - Validate application setup and dependencies"
+	@echo "  make validate-data-report   - Validate data integrity"
+	@echo "  make help            - Show this help message"

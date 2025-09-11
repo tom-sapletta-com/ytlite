@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { invoke } from './tauriInvoke'
+import ProgressBar from './components/ProgressBar'
 
 interface Tokens {
   access_token: string
@@ -13,31 +14,40 @@ interface AppConfig {
   client_secret: string
 }
 
+interface Voice {
+  language: string
+  gender: string
+  description: string
+}
+
+interface Template {
+  name: string
+  description: string
+  background_color: string
+  text_color: string
+  font_size: number
+  font_family: string
+}
+
 export default function App() {
   const [status, setStatus] = useState('')
   const [tokens, setTokens] = useState<Tokens | null>(null)
   const [channels, setChannels] = useState<any[]>([])
   const [cfg, setCfg] = useState<AppConfig>({ client_id: '', client_secret: '' })
-  const isCallback = typeof window !== 'undefined' && window.location.pathname === '/callback'
+  const [isCallback, setIsCallback] = useState(false)
+  const [isProcessing, setIsProcessing] = useState(false)
+  const [currentStep, setCurrentStep] = useState(0)
+  const [totalSteps, setTotalSteps] = useState(6)
+  const [currentDescription, setCurrentDescription] = useState('')
+  const [voices, setVoices] = useState<Record<string, Voice>>({})
+  const [selectedVoice, setSelectedVoice] = useState('pl-PL-MarekNeural')
+  const [templates, setTemplates] = useState<Record<string, Template>>({})
+  const [selectedTemplate, setSelectedTemplate] = useState('default')
 
-  // On mount, if callback path, parse code and exchange
   useEffect(() => {
-    if (!isCallback) return
-    const params = new URLSearchParams(window.location.search)
-    const code = params.get('code')
-    if (code) {
-      setStatus('Wymieniam code na tokeny...')
-      invoke('exchange_code', { code })
-        .then(() => {
-          setStatus('Autoryzacja zakończona. Możesz zamknąć to okno.')
-        })
-        .catch((e) => setStatus('Błąd wymiany tokenów: ' + String(e)))
-    } else {
-      setStatus('Brak parametru code w callbacku')
-    }
-  }, [isCallback])
+    setIsCallback(typeof window !== 'undefined' && window.location.pathname === '/callback')
+  }, [])
 
-  // Load config and tokens initially
   useEffect(() => {
     ;(async () => {
       try {
@@ -48,6 +58,16 @@ export default function App() {
       try {
         const t = (await invoke('check_tokens')) as Tokens
         if (t && t.access_token) setTokens(t)
+      } catch {}
+
+      try {
+        const v = (await invoke('get_voices')) as Record<string, Voice>
+        setVoices(v)
+      } catch {}
+
+      try {
+        const t = (await invoke('get_templates')) as Record<string, Template>
+        setTemplates(t)
       } catch {}
     })()
   }, [])
@@ -115,6 +135,54 @@ export default function App() {
     }
   }
 
+  const handleProcessContent = async () => {
+    setIsProcessing(true)
+    setCurrentStep(1)
+    setCurrentDescription('Parsing content...')
+
+    // Simulate processing steps (replace with actual processing logic)
+    setTimeout(() => {
+      setCurrentStep(2)
+      setCurrentDescription('Preparing output paths...')
+    }, 1000)
+    setTimeout(() => {
+      setCurrentStep(3)
+      setCurrentDescription(`Generating audio with voice: ${selectedVoice}...`)
+    }, 2000)
+    setTimeout(() => {
+      setCurrentStep(4)
+      setCurrentDescription('Creating slides...')
+    }, 3000)
+    setTimeout(() => {
+      setCurrentStep(5)
+      setCurrentDescription('Creating video...')
+    }, 4000)
+    setTimeout(() => {
+      setCurrentStep(6)
+      setCurrentDescription('Generating shorts...')
+    }, 5000)
+    setTimeout(() => {
+      setIsProcessing(false)
+      setCurrentStep(0)
+      setCurrentDescription('')
+    }, 6000)
+
+    // Actual invocation of backend processing with selected voice and template
+    try {
+      await invoke('process_content', { voice: selectedVoice, template: selectedTemplate })
+    } catch (error) {
+      console.error('Error processing content:', error)
+    }
+  }
+
+  const handleVoiceChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
+    setSelectedVoice(event.target.value)
+  }
+
+  const handleTemplateChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
+    setSelectedTemplate(event.target.value)
+  }
+
   if (isCallback) {
     return (
       <div style={{ padding: 24, fontFamily: 'system-ui, sans-serif' }}>
@@ -179,6 +247,37 @@ export default function App() {
           ))}
         </ul>
       </section>
+
+      <section style={{ margin: '20px 0' }}>
+        <h2>Wybór głosu i szablonu</h2>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxWidth: 640 }}>
+          <label>
+            Wybierz głos:
+            <select value={selectedVoice} onChange={handleVoiceChange}>
+              {Object.entries(voices).map(([id, details]) => (
+                <option key={id} value={id}>{details.description}</option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Wybierz szablon:
+            <select value={selectedTemplate} onChange={handleTemplateChange}>
+              {Object.entries(templates).map(([id, details]) => (
+                <option key={id} value={id}>{details.name} - {details.description}</option>
+              ))}
+            </select>
+          </label>
+          <div>
+            <button onClick={handleProcessContent} disabled={isProcessing}>
+              {isProcessing ? 'Przetwarzanie...' : 'Przetwórz zawartość'}
+            </button>
+          </div>
+        </div>
+      </section>
+
+      {isProcessing && (
+        <ProgressBar currentStep={currentStep} totalSteps={totalSteps} currentDescription={currentDescription} />
+      )}
 
       <section>
         <h3>Instrukcje</h3>

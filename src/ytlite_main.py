@@ -13,6 +13,7 @@ import yaml
 from rich.console import Console
 from dotenv import load_dotenv
 from logging_setup import get_logger
+from progress import ProgressReporter
 
 # Import our modules
 from dependencies import verify_dependencies
@@ -91,38 +92,58 @@ class YTLite:
             except Exception:
                 pass
 
+            # Initialize progress reporter
+            base_name = Path(markdown_path).stem
+            pr = ProgressReporter(base_name, self.output_dir)
+            pr.update("parse", "Step 1: Parsing content...", 10, {"file": markdown_path})
             console.print("Step 1: Parsing content...")
             logger.info("Step 1: parse_markdown start", extra={"file": markdown_path})
             metadata, paragraphs = self.content_parser.parse_markdown(markdown_path)
             console.print("Step 1: Done.")
             logger.info("Step 1: parse_markdown done", extra={"title": metadata.get('title')})
+            pr.update("parse_done", "Step 1: Done.", 20, {"title": metadata.get('title')})
 
             console.print("Step 2: Preparing output paths...")
-            base_name = Path(markdown_path).stem
             audio_path = self.output_dir / "audio" / f"{base_name}.mp3"
             video_path = self.output_dir / "videos" / f"{base_name}.mp4"
             console.print(f"Audio path: {audio_path}")
             console.print(f"Video path: {video_path}")
             console.print("Step 2: Done.")
             logger.info("Step 2: paths prepared", extra={"audio": str(audio_path), "video": str(video_path)})
+            pr.update("paths", "Step 2: Paths ready", 30, {"audio": str(audio_path), "video": str(video_path)})
 
             console.print("Step 3: Generating audio...")
             combined_text = self.audio_generator.combine_text_for_audio(paragraphs)
             self.audio_generator.generate_audio(combined_text, str(audio_path))
             console.print("Step 3: Done.")
             logger.info("Step 3: audio done", extra={"audio": str(audio_path)})
+            pr.update("audio", "Step 3: Audio ready", 50, {"audio": str(audio_path)})
 
             console.print("Step 4: Creating slides...")
             slides_text = self.content_parser.prepare_content_for_video(paragraphs)
             slide_paths = []
+            # Metadata overrides
+            lang = metadata.get('lang')
+            theme = metadata.get('theme', 'tech')
+            template = metadata.get('template', 'classic')
+            font_size_override = metadata.get('font_size')
+            colors = metadata.get('colors') if isinstance(metadata.get('colors'), dict) else None
+            # Voice override for audio
+            if metadata.get('voice'):
+                self.audio_generator.voice = metadata['voice']
             for i, text in enumerate(slides_text):
                 slide_path = self.video_generator.create_slide(
-                    text, 
-                    theme=metadata.get('theme', 'tech')
+                    text,
+                    theme=theme,
+                    lang=lang,
+                    template=template,
+                    font_size=font_size_override,
+                    colors=colors
                 )
                 slide_paths.append(slide_path)
             console.print(f"Step 4: Done. Created {len(slide_paths)} slides.")
             logger.info("Step 4: slides done", extra={"count": len(slide_paths)})
+            pr.update("slides", f"Step 4: {len(slide_paths)} slides created", 65, {"count": len(slide_paths)})
 
             console.print("Step 5: Creating video...")
             self.video_generator.create_video_from_slides(
@@ -132,12 +153,14 @@ class YTLite:
             )
             console.print("Step 5: Done.")
             logger.info("Step 5: video done", extra={"video": str(video_path)})
+            pr.update("video", "Step 5: Video ready", 85, {"video": str(video_path)})
             
             console.print(f"[green]✓ Video generated: {video_path}[/green]")
             # Generate thumbnail
             thumbnail_path = self.output_dir / "thumbnails" / f"{base_name}.jpg"
             self.video_generator.create_thumbnail(str(video_path), str(thumbnail_path))
             logger.info("Thumbnail created", extra={"thumb": str(thumbnail_path)})
+            pr.update("thumbnail", "Thumbnail created", 90, {"thumb": str(thumbnail_path)})
 
             if self.config.get("generate_shorts", True):
                 console.print("Step 6: Generating shorts...")
@@ -151,6 +174,7 @@ class YTLite:
                     logger.warning("Shorts generation failed", extra={"error": str(e)})
             else:
                 shorts_path = None
+            pr.update("shorts", "Step 6: Shorts done or skipped", 92, {"shorts": bool(shorts_path)})
 
             # Package project assets into output/projects/<name>
             self.package_project(
@@ -164,7 +188,9 @@ class YTLite:
                 shorts_path=str(shorts_path) if shorts_path else None,
             )
             logger.info("Packaging done", extra={"project": base_name})
+            pr.update("package", "Packaging done", 98)
 
+            pr.done("Completed")
             return str(video_path)
         except Exception as e:
             console.print(f"[bold red]Error in generate_video for {markdown_path}: {e}[/bold red]")

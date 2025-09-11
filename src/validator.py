@@ -279,6 +279,112 @@ class VideoValidator:
         
         console.print(table)
 
+class Validator:
+    def __init__(self, project_dir):
+        self.project_dir = project_dir
+        self.reports_dir = os.path.join(project_dir, 'reports')
+        os.makedirs(self.reports_dir, exist_ok=True)
+
+    def validate_app(self):
+        """Validate the application setup and dependencies."""
+        results = []
+        try:
+            # Check for required dependencies
+            result = subprocess.run(['pip', 'list'], capture_output=True, text=True)
+            installed_packages = result.stdout
+            required_packages = ['requests', 'wordpress-xmlrpc', 'python-dotenv', 'webdavclient3']
+            for pkg in required_packages:
+                if pkg in installed_packages:
+                    results.append({'check': f"{pkg} installed", 'status': 'PASS'})
+                else:
+                    results.append({'check': f"{pkg} installed", 'status': 'FAIL', 'message': f"{pkg} is not installed."})
+
+            # Check for Tauri app build
+            tauri_build_result = subprocess.run(['cargo', 'build'], cwd=os.path.join(self.project_dir, 'tauri-youtube-oauth', 'src-tauri'), capture_output=True, text=True)
+            if tauri_build_result.returncode == 0:
+                results.append({'check': 'Tauri app build', 'status': 'PASS'})
+            else:
+                results.append({'check': 'Tauri app build', 'status': 'FAIL', 'message': tauri_build_result.stderr})
+
+            # Check for frontend build
+            frontend_build_result = subprocess.run(['npm', 'run', 'build:frontend'], cwd=os.path.join(self.project_dir, 'tauri-youtube-oauth'), capture_output=True, text=True)
+            if frontend_build_result.returncode == 0:
+                results.append({'check': 'Frontend build', 'status': 'PASS'})
+            else:
+                results.append({'check': 'Frontend build', 'status': 'FAIL', 'message': frontend_build_result.stderr})
+
+        except Exception as e:
+            results.append({'check': 'App validation', 'status': 'ERROR', 'message': str(e)})
+
+        report = {
+            'validation_type': 'app',
+            'timestamp': datetime.now().isoformat(),
+            'results': results
+        }
+        report_path = os.path.join(self.reports_dir, f'app_validation_report_{datetime.now().strftime("%Y%m%d_%H%M%S")}.json')
+        with open(report_path, 'w') as f:
+            json.dump(report, f, indent=2)
+
+        summary = self.summarize_report(report)
+        return summary, report_path
+
+    def validate_data(self, content_path):
+        """Validate the data integrity for content files."""
+        results = []
+        try:
+            # Check if content path exists
+            if not os.path.exists(content_path):
+                results.append({'check': 'Content path existence', 'status': 'FAIL', 'message': f"Content path {content_path} does not exist."})
+            else:
+                results.append({'check': 'Content path existence', 'status': 'PASS'})
+
+                # Check for markdown files
+                md_files = [f for f in os.listdir(content_path) if f.endswith('.md')]
+                if not md_files:
+                    results.append({'check': 'Markdown files presence', 'status': 'FAIL', 'message': "No markdown files found in content path."})
+                else:
+                    results.append({'check': 'Markdown files presence', 'status': 'PASS', 'message': f"Found {len(md_files)} markdown files."})
+
+                    # Validate content of each markdown file
+                    for md_file in md_files:
+                        with open(os.path.join(content_path, md_file), 'r', encoding='utf-8') as f:
+                            content = f.read()
+                            if not content.strip():
+                                results.append({'check': f"Content validation for {md_file}", 'status': 'FAIL', 'message': f"{md_file} is empty."})
+                            else:
+                                results.append({'check': f"Content validation for {md_file}", 'status': 'PASS'})
+
+        except Exception as e:
+            results.append({'check': 'Data validation', 'status': 'ERROR', 'message': str(e)})
+
+        report = {
+            'validation_type': 'data',
+            'timestamp': datetime.now().isoformat(),
+            'content_path': content_path,
+            'results': results
+        }
+        report_path = os.path.join(self.reports_dir, f'data_validation_report_{datetime.now().strftime("%Y%m%d_%H%M%S")}.json')
+        with open(report_path, 'w') as f:
+            json.dump(report, f, indent=2)
+
+        summary = self.summarize_report(report)
+        return summary, report_path
+
+    def summarize_report(self, report):
+        """Summarize the validation report into a concise format."""
+        summary = f"Validation Type: {report['validation_type'].capitalize()}\nTimestamp: {report['timestamp']}\n"
+        pass_count = sum(1 for r in report['results'] if r['status'] == 'PASS')
+        fail_count = sum(1 for r in report['results'] if r['status'] == 'FAIL')
+        error_count = sum(1 for r in report['results'] if r['status'] == 'ERROR')
+        summary += f"Results: {pass_count} Passed, {fail_count} Failed, {error_count} Errors\n"
+        for result in report['results']:
+            if result['status'] != 'PASS':
+                summary += f"- {result['check']}: {result['status']}"
+                if 'message' in result:
+                    summary += f" ({result['message'][:100]}...)"
+                summary += "\n"
+        return summary
+
 def validate_all_videos(video_dir: str = "output/videos", content_dir: str = "content/episodes"):
     """Validate all videos in directory"""
     validator = VideoValidator()
@@ -315,3 +421,16 @@ def validate_all_videos(video_dir: str = "output/videos", content_dir: str = "co
     # Generate report
     report = validator.generate_report(results)
     return report
+
+def main():
+    validator = Validator('/home/tom/github/tom-sapletta-com/ytlite')
+    app_summary, app_report_path = validator.validate_app()
+    print("App Validation Summary:\n", app_summary)
+    print(f"Full report at: {app_report_path}\n")
+
+    data_summary, data_report_path = validator.validate_data('/home/tom/github/tom-sapletta-com/ytlite/content/episodes')
+    print("Data Validation Summary:\n", data_summary)
+    print(f"Full report at: {data_report_path}")
+
+if __name__ == "__main__":
+    main()

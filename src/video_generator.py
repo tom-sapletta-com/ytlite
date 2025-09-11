@@ -50,39 +50,111 @@ class VideoGenerator:
         self.fps = config.get("fps", 30)
         self.font_size = config.get("font_size", 48)
         
-    def create_slide(self, text: str, theme: str = "tech") -> str:
-        """Create a slide image from text"""
+    def _pick_font(self, lang: str | None, size: int) -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
+        # Language-aware font selection (DejaVu covers PL/DE/EN). Allow override via config font_path
+        font_path = self.config.get("font_path")
+        candidates = []
+        if font_path:
+            candidates.append(font_path)
+        # Common Linux path
+        candidates.append("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf")
+        # MacOS
+        candidates.append("/Library/Fonts/Arial Unicode.ttf")
+        # Fallbacks
+        for fp in candidates:
+            try:
+                return ImageFont.truetype(fp, size)
+            except Exception:
+                continue
+        console.print("[yellow]Warning: Could not load font, using default[/]")
+        return ImageFont.load_default()
+
+    def _draw_gradient_bg(self, img: Image.Image, start: str = "#1e1e2e", end: str = "#3b3b5b"):
+        w, h = img.size
+        draw = ImageDraw.Draw(img)
+        for y in range(h):
+            ratio = y / max(1, h - 1)
+            sr, sg, sb = ImageColor.getrgb(start) if hasattr(Image, 'Color') else (30, 30, 46)
+            er, eg, eb = ImageColor.getrgb(end) if hasattr(Image, 'Color') else (59, 59, 91)
+            r = int(sr + (er - sr) * ratio)
+            g = int(sg + (eg - sg) * ratio)
+            b = int(sb + (eb - sb) * ratio)
+            draw.line([(0, y), (w, y)], fill=(r, g, b))
+
+    def create_slide(self, text: str, theme: str = "tech", lang: str | None = None,
+                     template: str = "classic", font_size: int | None = None,
+                     colors: dict | None = None) -> str:
+        """Create a slide image from text with optional template and language-aware font."""
         # Get theme colors
         themes = self.config.get("themes", {})
-        theme_config = themes.get(theme, themes.get("tech"))
-        
+        theme_config = themes.get(theme, themes.get("tech", {}))
+        if colors:
+            theme_config = {**theme_config, **colors}
         bg_color = theme_config.get("bg_color", "#1e1e2e")
         text_color = theme_config.get("text_color", "#cdd6f4")
-        
+
         # Create image
         img = Image.new("RGB", self.resolution, bg_color)
         draw = ImageDraw.Draw(img)
+
+        # Optional gradient background
+        if template == "gradient":
+            try:
+                from PIL import ImageColor  # type: ignore
+            except Exception:
+                ImageColor = None  # type: ignore
+            try:
+                # Use darker/lighter variant if available
+                self._draw_gradient_bg(img, bg_color, theme_config.get("bg_color_2", "#3b3b5b"))
+            except Exception:
+                pass
+
+        # Font
+        fsize = int(font_size or self.font_size)
+        font = self._pick_font(lang, fsize)
+
+        # Multi-line support (split on \n)
+        lines = [line for line in text.split("\n") if line.strip()]
+        line_heights = []
+        max_w = 0
+        for line in lines:
+            bbox = draw.textbbox((0, 0), line, font=font)
+            w = bbox[2] - bbox[0]
+            h = bbox[3] - bbox[1]
+            max_w = max(max_w, w)
+            line_heights.append(h)
+        total_h = sum(line_heights) + (len(lines) - 1) * int(fsize * 0.3)
+
+        # Positioning
+        x = (self.resolution[0] - max_w) // 2
+        y = (self.resolution[1] - total_h) // 2
+        if template == "left":
+            x = int(self.resolution[0] * 0.1)
         
-        # Try to load font
-        try:
-            font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 
-                                    self.font_size)
-        except:
-            console.print("[yellow]Warning: Could not load font, using default[/]")
-            font = ImageFont.load_default()
-        
-        # Draw text centered
-        bbox = draw.textbbox((0, 0), text, font=font)
-        text_width = bbox[2] - bbox[0]
-        text_height = bbox[3] - bbox[1]
-        
-        x = (self.resolution[0] - text_width) // 2
-        y = (self.resolution[1] - text_height) // 2
-        
-        draw.text((x, y), text, fill=text_color, font=font)
-        
+        # Optional boxed background for text
+        if template == "boxed":
+            padding = int(fsize * 0.6)
+            box_w = max_w + 2 * padding
+            box_h = total_h + 2 * padding
+            box_x = (self.resolution[0] - box_w) // 2
+            box_y = (self.resolution[1] - box_h) // 2
+            draw.rectangle([box_x, box_y, box_x + box_w, box_y + box_h], fill=theme_config.get("box_color", "#00000080"))
+
+        # Draw each line
+        cur_y = y
+        for i, line in enumerate(lines):
+            bbox = draw.textbbox((0, 0), line, font=font)
+            w = bbox[2] - bbox[0]
+            h = bbox[3] - bbox[1]
+            if template != "left":
+                cur_x = (self.resolution[0] - w) // 2
+            else:
+                cur_x = x
+            draw.text((cur_x, cur_y), line, fill=text_color, font=font)
+            cur_y += h + int(fsize * 0.3)
+
         # Save temporary image
-        temp_path = f"/tmp/slide_{hash(text)}.png"
+        temp_path = f"/tmp/slide_{hash((text, theme, template, fsize))}.png"
         img.save(temp_path)
         logger.info("Slide created", extra={"path": temp_path, "len": len(text)})
         return temp_path
