@@ -12,21 +12,34 @@ from rich.console import Console
 
 console = Console()
 
-# Import moviepy directly
+# Import MoviePy using explicit submodules for broad compatibility
 try:
-    from moviepy.editor import (
-        VideoFileClip, TextClip, CompositeVideoClip, 
-        ImageClip, concatenate_videoclips, AudioFileClip
-    )
-except ImportError:
-    console.print("[red]MoviePy not available. Installing...[/]")
-    import subprocess
-    import sys
-    subprocess.check_call([sys.executable, "-m", "pip", "install", "moviepy"])
-    from moviepy.editor import (
-        VideoFileClip, TextClip, CompositeVideoClip, 
-        ImageClip, concatenate_videoclips, AudioFileClip
-    )
+    from moviepy.video.io.VideoFileClip import VideoFileClip
+    from moviepy.video.VideoClip import ImageClip, TextClip
+    from moviepy.video.compositing.CompositeVideoClip import CompositeVideoClip
+    from moviepy.video.compositing.concatenate import concatenate_videoclips
+    from moviepy.audio.io.AudioFileClip import AudioFileClip
+except Exception:
+    try:
+        # Fallback to aggregator (older versions)
+        from moviepy.editor import (
+            VideoFileClip, TextClip, CompositeVideoClip,
+            ImageClip, concatenate_videoclips, AudioFileClip
+        )
+    except Exception as e:
+        console.print("[red]MoviePy import failed. Attempting installation...[/]")
+        import subprocess
+        import sys
+        try:
+            subprocess.check_call([sys.executable, "-m", "pip", "install", "moviepy"])
+            from moviepy.video.io.VideoFileClip import VideoFileClip
+            from moviepy.video.VideoClip import ImageClip, TextClip
+            from moviepy.video.compositing.CompositeVideoClip import CompositeVideoClip
+            from moviepy.video.compositing.concatenate import concatenate_videoclips
+            from moviepy.audio.io.AudioFileClip import AudioFileClip
+        except Exception as inner_e:
+            console.print(f"[bold red]MoviePy import still failing after install: {inner_e}[/]")
+            raise
 
 class VideoGenerator:
     def __init__(self, config):

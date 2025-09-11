@@ -70,7 +70,7 @@ class YTLite:
 
             console.print("Step 2: Preparing output paths...")
             base_name = Path(markdown_path).stem
-            audio_path = self.output_dir / "audio" / f"{base_name}.wav"
+            audio_path = self.output_dir / "audio" / f"{base_name}.mp3"
             video_path = self.output_dir / "videos" / f"{base_name}.mp4"
             console.print(f"Audio path: {audio_path}")
             console.print(f"Video path: {video_path}")

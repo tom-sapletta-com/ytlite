@@ -24,12 +24,27 @@ from dotenv import load_dotenv
 console = Console()
 
 try:
-    from moviepy.editor import VideoFileClip, TextClip, CompositeVideoClip, ImageClip, concatenate_videoclips, AudioFileClip
-except ImportError:
-    console.print("[red]Error: moviepy not installed properly. Installing...[/]")
-    import subprocess
-    subprocess.check_call([sys.executable, "-m", "pip", "install", "moviepy"])
-    from moviepy.editor import VideoFileClip, TextClip, CompositeVideoClip, ImageClip, concatenate_videoclips, AudioFileClip
+    from moviepy.video.io.VideoFileClip import VideoFileClip
+    from moviepy.video.VideoClip import ImageClip, TextClip
+    from moviepy.video.compositing.CompositeVideoClip import CompositeVideoClip
+    from moviepy.video.compositing.concatenate import concatenate_videoclips
+    from moviepy.audio.io.AudioFileClip import AudioFileClip
+except Exception:
+    try:
+        # Fallback to aggregator (older MoviePy versions)
+        from moviepy.editor import (
+            VideoFileClip, TextClip, CompositeVideoClip, ImageClip,
+            concatenate_videoclips, AudioFileClip
+        )
+    except Exception:
+        console.print("[red]Error: moviepy not installed properly. Installing...[/]")
+        import subprocess
+        subprocess.check_call([sys.executable, "-m", "pip", "install", "moviepy"])
+        from moviepy.video.io.VideoFileClip import VideoFileClip
+        from moviepy.video.VideoClip import ImageClip, TextClip
+        from moviepy.video.compositing.CompositeVideoClip import CompositeVideoClip
+        from moviepy.video.compositing.concatenate import concatenate_videoclips
+        from moviepy.audio.io.AudioFileClip import AudioFileClip
 
 # Load environment variables
 load_dotenv()

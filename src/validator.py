@@ -24,13 +24,22 @@ except ImportError:
     import whisper
 
 try:
+    # MoviePy 1.x path
     from moviepy.editor import VideoFileClip
-except ImportError:
-    console.print("[yellow]MoviePy not found. Installing...[/]")
-    import subprocess
-    import sys
-    subprocess.check_call([sys.executable, "-m", "pip", "install", "moviepy"])
-    from moviepy.editor import VideoFileClip
+except Exception:
+    try:
+        # MoviePy 2.x path
+        from moviepy import VideoFileClip
+    except Exception as e:
+        console.print("[yellow]MoviePy not found. Installing...[/]")
+        import subprocess
+        import sys
+        try:
+            subprocess.check_call([sys.executable, "-m", "pip", "install", "moviepy"])
+            from moviepy import VideoFileClip
+        except Exception as inner_e:
+            console.print(f"[bold red]MoviePy import failed after install: {inner_e}[/]")
+            raise
 
 class VideoValidator:
     def __init__(self):

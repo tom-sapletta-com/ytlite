@@ -31,11 +31,26 @@ def check_and_install_package(package_name, import_name=None):
 def check_os_dependencies():
     """Check for essential OS-level command-line tools."""
     console.print("[cyan]Checking OS-level dependencies...[/]")
-    required_commands = ["ffmpeg", "sox", "espeak-ng"]
+    # Only ffmpeg is strictly required for video encoding/decoding.
+    # Other tools (sox, espeak-ng) are optional in the current pipeline
+    # which uses edge-tts for audio.
+    required_commands = ["ffmpeg"]
     all_found = True
 
     for cmd in required_commands:
         if subprocess.call(["which", cmd], stdout=subprocess.PIPE, stderr=subprocess.PIPE) != 0:
+            # Try to use bundled ffmpeg from imageio-ffmpeg
+            try:
+                import os
+                import imageio_ffmpeg
+                ffmpeg_path = imageio_ffmpeg.get_ffmpeg_exe()
+                if ffmpeg_path:
+                    os.environ.setdefault("IMAGEIO_FFMPEG_EXE", ffmpeg_path)
+                    console.print(f"[yellow]⚠ System '{cmd}' not found. Using bundled ffmpeg at: {ffmpeg_path}[/]")
+                    continue
+            except Exception:
+                pass
+
             console.print(f"[bold red]✗ Dependency '{cmd}' not found.[/]")
             console.print(f"  Please install it using your system's package manager.")
             console.print(f"  Example: [cyan]sudo apt-get install {cmd}[/]")
@@ -46,7 +61,8 @@ def check_os_dependencies():
 def verify_dependencies():
     """Verify all required dependencies are installed"""
     required_packages = [
-        ("moviepy", "moviepy.editor"),
+        ("moviepy", "moviepy"),
+        ("imageio-ffmpeg", "imageio_ffmpeg"),
         ("edge-tts", "edge_tts"),
         ("python-frontmatter", "frontmatter"),
         ("pyyaml", "yaml"),
@@ -62,16 +78,6 @@ def verify_dependencies():
     for package, import_name in required_packages:
         if not check_and_install_package(package, import_name):
             all_ok = False
-            # Special handling for moviepy due to import issues
-            if package == "moviepy":
-                console.print(f"[yellow]Forcing reinstall of a specific version of {package} due to import issue...[/]")
-                try:
-                    subprocess.check_call([sys.executable, "-m", "pip", "install", "--force-reinstall", "moviepy==1.0.3"])
-                    console.print(f"[green]✓ {package} version 1.0.3 reinstalled successfully[/]")
-                    if check_and_install_package(package, import_name):
-                        all_ok = True  # Recheck after reinstall
-                except subprocess.CalledProcessError:
-                    console.print(f"[red]✗ Failed to reinstall {package}[/]")
     
     # Check OS-level dependencies like ffmpeg
     if not check_os_dependencies():
