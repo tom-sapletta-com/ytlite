@@ -189,7 +189,7 @@ async function loadProjects() {
             '<div class="project-actions">' + 
               (project.svg ? '<a href="/files/projects/' + project.name + '/' + project.svg + '" target="_blank" class="btn btn-primary">📄 Open SVG</a>' : '') +
               '<a href="/files/projects/' + project.name + '/" target="_blank" class="btn">📂 Files</a>' +
-              '<button onclick="editProject(\'' + project.name + '\')" class="btn">✏️ Edit</button>' +
+              '<button onclick="editProject(\\\'' + project.name + '\\\')" class="btn">✏️ Edit</button>' +
             '</div>' +
           '</div>'
         ).join('') + '</div>';
