@@ -8,8 +8,10 @@ import frontmatter
 from pathlib import Path
 from datetime import datetime
 from rich.console import Console
+from logging_setup import get_logger
 
 console = Console()
+logger = get_logger("content_parser")
 
 class ContentParser:
     def __init__(self):
@@ -18,6 +20,7 @@ class ContentParser:
     def parse_markdown(self, file_path: str):
         """Parse markdown file with frontmatter"""
         console.print(f"[cyan]Parsing {file_path}...[/]")
+        logger.info("parse_markdown start", extra={"file": file_path})
         
         with open(file_path, 'r', encoding='utf-8') as f:
             raw_text = f.read()
@@ -31,6 +34,7 @@ class ContentParser:
             post_content = (post.content or "").strip()
         except Exception as e:
             console.print(f"[yellow]Warning: Invalid frontmatter in {file_path}: {e}. Falling back to raw content.[/]")
+            logger.warning("Invalid frontmatter, fallback to raw content", extra={"file": file_path, "error": str(e)})
             # Remove frontmatter block if present (--- ... ---)
             text = raw_text
             lines = text.splitlines()
@@ -61,6 +65,7 @@ class ContentParser:
         if not paragraphs:
             console.print("[yellow]Warning: No content found in markdown file[/]")
             paragraphs = [metadata['title']]
+        logger.info("parse_markdown done", extra={"title": metadata.get('title'), "paragraphs": len(paragraphs)})
         
         return metadata, paragraphs
     

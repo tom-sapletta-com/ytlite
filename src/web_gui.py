@@ -26,9 +26,11 @@ from dependencies import verify_dependencies
 from ytlite_main import YTLite
 from wordpress_publisher import WordPressPublisher
 from storage_nextcloud import NextcloudClient
+from logging_setup import get_logger
 
 console = Console()
 app = Flask(__name__)
+logger = get_logger("web_gui")
 BASE_DIR = Path(__file__).resolve().parent.parent
 OUTPUT_DIR = BASE_DIR / 'output'
 
@@ -135,6 +137,7 @@ async function fetchNC() {
 
 @app.route('/')
 def index():
+    logger.info("GET /")
     return render_template_string(INDEX_HTML)
 
 @app.route('/output-index')
@@ -142,17 +145,20 @@ def output_index():
     # Serve the output README via Flask if nginx isn't running
     p = OUTPUT_DIR / 'README.md'
     if p.exists():
+        logger.info("Serve output README", extra={"path": str(p)})
         return p.read_text(encoding='utf-8'), 200, {'Content-Type': 'text/markdown; charset=utf-8'}
     return 'No output yet', 404
 
 @app.route('/files/<path:subpath>')
 def files(subpath: str):
     # Serve files from output/ directory for preview inside GUI (absolute path)
+    logger.info("GET /files", extra={"subpath": subpath})
     return send_from_directory(str(OUTPUT_DIR), subpath, as_attachment=False)
 
 @app.route('/api/generate', methods=['POST'])
 def api_generate():
     try:
+        logger.info("POST /api/generate start")
         verify_dependencies()
         project = request.form.get('project') or (request.json and request.json.get('project'))
         markdown = request.form.get('markdown') or (request.json and request.json.get('markdown'))
@@ -170,11 +176,13 @@ def api_generate():
             env_path = proj_dir/'.env'
             envfile.save(str(env_path))
             load_dotenv(env_path)
+            logger.info("Per-project .env uploaded and loaded", extra={"env": str(env_path)})
         else:
             # Load existing per-project .env if present
             env_path = proj_dir/'.env'
             if env_path.exists():
                 load_dotenv(env_path)
+                logger.info("Per-project .env loaded", extra={"env": str(env_path)})
 
         # Write markdown to content/episodes
         if markdown and markdown.strip():
@@ -183,6 +191,7 @@ def api_generate():
             if not markdown.lstrip().startswith('---'):
                 markdown = f"---\ntitle: {project}\ndate: {datetime.now().date()}\n---\n\n" + markdown
             md_path.write_text(markdown, encoding='utf-8')
+            logger.info("Markdown written", extra={"path": str(md_path)})
         else:
             md_path = Path('content/episodes')/f"{project}.md"
             if not md_path.exists():
@@ -199,9 +208,11 @@ def api_generate():
             'audio': f"/files/projects/{project}/audio.mp3",
             'thumb': f"/files/projects/{project}/thumbnail.jpg",
         }
+        logger.info("POST /api/generate ok", extra={"project": project})
         return jsonify({'project': project, 'urls': urls})
     except Exception as e:
         console.print(f"[red]API generate error: {e}[/]")
+        logger.error("POST /api/generate failed", extra={"error": str(e)})
         return jsonify({'message': str(e)}), 500
 
 @app.route('/api/publish_wordpress', methods=['POST'])
@@ -216,12 +227,16 @@ def api_publish_wordpress():
         env_path = proj_dir/'.env'
         if env_path.exists():
             load_dotenv(env_path)
+        logger.info("POST /api/publish_wordpress", extra={"project": project, "status": status})
         pub = WordPressPublisher()
         result = pub.publish_project(str(proj_dir), publish_status=status)
         if not result:
+            logger.error("Publish failed", extra={"project": project})
             return jsonify({'message': 'Publish failed'}), 500
+        logger.info("Publish ok", extra={"project": project, "id": result.get('id') if isinstance(result, dict) else None})
         return jsonify(result)
     except Exception as e:
+        logger.error("POST /api/publish_wordpress failed", extra={"error": str(e)})
         return jsonify({'message': str(e)}), 500
 
 @app.route('/api/fetch_nextcloud', methods=['POST'])
@@ -238,15 +253,19 @@ def api_fetch_nextcloud():
             env_path = proj_dir/'.env'
             if env_path.exists():
                 load_dotenv(env_path)
+        logger.info("POST /api/fetch_nextcloud", extra={"remote_path": remote_path, "project": project})
         # Download to content/episodes using original filename
         filename = Path(remote_path).name or 'download.md'
         local = Path('content/episodes')/filename
         client = NextcloudClient()
         ok = client.download_file(remote_path, str(local))
         if not ok:
+            logger.error("Nextcloud download failed", extra={"remote_path": remote_path})
             return jsonify({'message': 'Download failed'}), 500
+        logger.info("Nextcloud download ok", extra={"local": str(local)})
         return jsonify({'local_path': str(local)})
     except Exception as e:
+        logger.error("POST /api/fetch_nextcloud failed", extra={"error": str(e)})
         return jsonify({'message': str(e)}), 500
 
 if __name__ == '__main__':

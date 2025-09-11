@@ -4,37 +4,15 @@
 )]
 
 use tauri::{
-    Builder, Context, Config, Invoke, PackageInfo, Pattern,
+    Builder, Invoke,
 };
-use std::sync::Arc;
 
 fn main() {
-    let config = Config::default();
-    let package_info = PackageInfo {
-        name: "tauri-youtube-oauth".to_string(),
-        version: "0.1.0".to_string(),
-        authors: "".to_string(),
-        description: "YouTube OAuth App".to_string(),
-    };
-    
     Builder::default()
         .invoke_handler(|invoke: Invoke| {
             // Empty handler for minimal setup
             invoke.resolver.respond(Ok(serde_json::Value::Null));
         })
-        .run(Context::new(
-            config,
-            Arc::new(tauri::EmbeddedAssets::default()), // assets
-            None, // Option<Icon>
-            None, // Option<Vec<u8>>
-            None, // Option<Icon>
-            package_info,
-            (), // system_tray_icon_as_template
-            Pattern::Brownfield(std::marker::PhantomData),
-            tauri::ShellScopeConfig {
-                open: String::new(),
-                scopes: std::collections::HashMap::new(),
-            }
-        ))
+        .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
