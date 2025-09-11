@@ -25,7 +25,7 @@ services:
       dockerfile: Dockerfile.base
     image: ytlite:base
     container_name: ytlite-base-build
-    profiles: ["build"]
+    profiles: ["build", "app"]
     networks:
       - ytlite-network
 
@@ -44,8 +44,10 @@ services:
       - PYTHONUNBUFFERED=1
       - DEBUG=${DEBUG:-0}
     depends_on:
-      - ytlite-base
+      ytlite-base:
+        condition: service_started
     profiles: ["app"]
+    command: ["tail", "-f", "/dev/null"]
     networks:
       - ytlite-network
 

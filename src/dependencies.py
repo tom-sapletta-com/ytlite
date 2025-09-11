@@ -29,23 +29,19 @@ def check_and_install_package(package_name, import_name=None):
             return False
 
 def check_os_dependencies():
-    """Run the universal OS dependency installer script."""
-    console.print("[cyan]Checking OS-level dependencies (e.g., ffmpeg)...[/]")
-    script_path = Path(__file__).parent.parent / "scripts" / "install-os-deps.sh"
-    
-    if not script_path.exists():
-        console.print(f"[red]Error: Dependency installer script not found at {script_path}[/]")
-        return False
+    """Check for essential OS-level command-line tools."""
+    console.print("[cyan]Checking OS-level dependencies...[/]")
+    required_commands = ["ffmpeg", "sox", "espeak-ng"]
+    all_found = True
 
-    try:
-        # Make sure the script is executable
-        subprocess.check_call(["chmod", "+x", str(script_path)])
-        # Run the script
-        subprocess.check_call([str(script_path)])
-        return True
-    except subprocess.CalledProcessError as e:
-        console.print(f"[red]OS dependency installation failed: {e}[/]")
-        return False
+    for cmd in required_commands:
+        if subprocess.call(["which", cmd], stdout=subprocess.PIPE, stderr=subprocess.PIPE) != 0:
+            console.print(f"[bold red]✗ Dependency '{cmd}' not found.[/]")
+            console.print(f"  Please install it using your system's package manager.")
+            console.print(f"  Example: [cyan]sudo apt-get install {cmd}[/]")
+            all_found = False
+
+    return all_found
 
 def verify_dependencies():
     """Verify all required dependencies are installed"""
@@ -66,6 +62,16 @@ def verify_dependencies():
     for package, import_name in required_packages:
         if not check_and_install_package(package, import_name):
             all_ok = False
+            # Special handling for moviepy due to import issues
+            if package == "moviepy":
+                console.print(f"[yellow]Forcing reinstall of a specific version of {package} due to import issue...[/]")
+                try:
+                    subprocess.check_call([sys.executable, "-m", "pip", "install", "--force-reinstall", "moviepy==1.0.3"])
+                    console.print(f"[green]✓ {package} version 1.0.3 reinstalled successfully[/]")
+                    if check_and_install_package(package, import_name):
+                        all_ok = True  # Recheck after reinstall
+                except subprocess.CalledProcessError:
+                    console.print(f"[red]✗ Failed to reinstall {package}[/]")
     
     # Check OS-level dependencies like ffmpeg
     if not check_os_dependencies():

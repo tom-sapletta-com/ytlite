@@ -3,21 +3,37 @@ name = "tauri-youtube-oauth"
 version = "0.1.0"
 edition = "2021"
 
-[dev-dependencies]
-mockito = "0.31"
-tauri = { version = "1.5.3", features = ["test"] }
-tempfile = "3"
+[lib]
+name = "tauri_youtube_oauth"
+path = "src/lib.rs"
+
+[[bin]]
+name = "tauri-youtube-oauth"
+path = "src/main.rs"
+
+[lib]
+name = "tauri_youtube_oauth"
+path = "src/lib.rs"
+
+[[bin]]
+name = "tauri-youtube-oauth"
+path = "src/main.rs"
+
+[build-dependencies]
+tauri-build = { version = "1.5.3" }
 
 [dependencies]
 anyhow = "1.0"
 reqwest = { version = "0.11", features = ["json", "rustls-tls"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-tauri = { version = "1.5.3", features = ["shell-open-api"] }
+tauri = { version = "1.5.3", features = ["shell-open-api", "api-all"] }
 tokio = { version = "1", features = ["macros", "rt-multi-thread", "time"] }
 url = "2"
 urlencoding = "2"
 warp = "0.3"
 
-[build-dependencies]
-tauri-build = { version = "1.5.3" }
+[dev-dependencies]
+mockito = "1.0.0-alpha.1"
+tauri = { version = "1.5.3", features = ["test"] }
+tempfile = "3"

@@ -1,9 +1,22 @@
 {
+  "build": {
+    "beforeDevCommand": "",
+    "beforeBuildCommand": "",
+    "devPath": "../dist",
+    "distDir": "../dist"
+  },
+  "package": {
+    "productName": "tauri-youtube-oauth",
+    "version": "0.1.0"
+  },
   "tauri": {
     "bundle": {
-      "identifier": "com.ytlite.oauth",
       "active": true,
+      "identifier": "com.ytlite.oauth",
       "icon": []
+    },
+    "allowlist": {
+      "all": true
     }
   }
 }
