@@ -141,10 +141,27 @@ class VideoGenerator:
         duration = min(60, video.duration)
         short_clip = video.subclip(0, duration)
         
-        # Resize to 9:16 aspect ratio
-        short_clip = short_clip.resize(height=1920)
-        short_clip = short_clip.crop(x_center=short_clip.w/2, width=1080)
-        
+        # Resize to 9:16 aspect ratio with compatibility across MoviePy versions
+        try:
+            # Prefer functional FX (MoviePy 2.x compatible)
+            try:
+                from moviepy.video.fx.resize import resize as fx_resize
+            except Exception:
+                from moviepy.video.fx.all import resize as fx_resize
+            try:
+                from moviepy.video.fx.crop import crop as fx_crop
+            except Exception:
+                from moviepy.video.fx.all import crop as fx_crop
+            short_clip = fx_resize(short_clip, height=1920)
+            short_clip = fx_crop(short_clip, x_center=short_clip.w/2, width=1080)
+        except Exception:
+            # Fallback to method API (MoviePy 1.x)
+            try:
+                short_clip = short_clip.resize(height=1920)
+                short_clip = short_clip.crop(x_center=short_clip.w/2, width=1080)
+            except Exception as e:
+                console.print(f"[yellow]Warning: Failed to apply resize/crop FX: {e}[/]")
+
         # Add watermark
         try:
             txt_clip = TextClip("SHORTS", fontsize=40, color='white', font='Arial')
@@ -164,3 +181,15 @@ class VideoGenerator:
         )
         
         console.print(f"[green]✓ Shorts created: {output_path}[/]")
+
+    def create_thumbnail(self, video_path: str, output_path: str):
+        """Create a thumbnail image from a representative video frame"""
+        console.print(f"[cyan]Creating thumbnail for {video_path}...[/]")
+        clip = VideoFileClip(video_path)
+        # Take frame from 1/3rd of the video or at 0.5s if too short
+        ts = max(0.5, min(clip.duration - 0.05, clip.duration / 3))
+        frame = clip.get_frame(ts)
+        img = Image.fromarray(frame)
+        Path(output_path).parent.mkdir(parents=True, exist_ok=True)
+        img.save(output_path, format='JPEG', quality=90)
+        console.print(f"[green]✓ Thumbnail created: {output_path}[/]")

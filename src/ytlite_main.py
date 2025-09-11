@@ -6,6 +6,7 @@ Refactored to use modular components
 
 import os
 import sys
+import shutil
 from pathlib import Path
 import click
 import yaml
@@ -101,13 +102,30 @@ class YTLite:
             console.print("Step 5: Done.")
             
             console.print(f"[green]✓ Video generated: {video_path}[/green]")
-            
+            # Generate thumbnail
+            thumbnail_path = self.output_dir / "thumbnails" / f"{base_name}.jpg"
+            self.video_generator.create_thumbnail(str(video_path), str(thumbnail_path))
+
             if self.config.get("generate_shorts", True):
                 console.print("Step 6: Generating shorts...")
                 shorts_path = self.output_dir / "shorts" / f"{base_name}_short.mp4"
                 self.video_generator.create_shorts(str(video_path), str(shorts_path))
                 console.print("Step 6: Done.")
-            
+            else:
+                shorts_path = None
+
+            # Package project assets into output/projects/<name>
+            self.package_project(
+                base_name=base_name,
+                metadata=metadata,
+                paragraphs=paragraphs,
+                markdown_path=markdown_path,
+                audio_path=str(audio_path),
+                video_path=str(video_path),
+                thumbnail_path=str(thumbnail_path),
+                shorts_path=str(shorts_path) if shorts_path else None,
+            )
+
             return str(video_path)
         except Exception as e:
             console.print(f"[bold red]Error in generate_video for {markdown_path}: {e}[/bold red]")
@@ -159,9 +177,113 @@ def batch(directory):
             failures += 1
             continue
     
+    # Build index summary after batch
+    try:
+        ytlite.build_output_index()
+    except Exception as e:
+        console.print(f"[yellow]Warning: Failed to build output index: {e}[/]")
+
     if failures > 0:
         console.print(f"[bold red]❌ Finished with {failures} errors.[/bold red]")
         sys.exit(1)
+
+@@
+    def package_project(self, base_name: str, metadata: dict, paragraphs: list, markdown_path: str,
+                        audio_path: str, video_path: str, thumbnail_path: str, shorts_path: str | None = None):
+        """Create per-project folder with all assets and a description markdown."""
+        project_dir = self.output_dir / "projects" / base_name
+        project_dir.mkdir(parents=True, exist_ok=True)
+
+        # Copy assets
+        try:
+            shutil.copy2(video_path, project_dir / "video.mp4")
+        except Exception as e:
+            console.print(f"[yellow]Warning: could not copy video: {e}")
+        try:
+            shutil.copy2(audio_path, project_dir / "audio.mp3")
+        except Exception as e:
+            console.print(f"[yellow]Warning: could not copy audio: {e}")
+        try:
+            shutil.copy2(thumbnail_path, project_dir / "thumbnail.jpg")
+        except Exception as e:
+            console.print(f"[yellow]Warning: could not copy thumbnail: {e}")
+        if shorts_path and os.path.exists(shorts_path):
+            try:
+                shutil.copy2(shorts_path, project_dir / "short.mp4")
+            except Exception as e:
+                console.print(f"[yellow]Warning: could not copy short: {e}")
+
+        # Save original source content for reference
+        try:
+            src_text = Path(markdown_path).read_text(encoding="utf-8")
+            (project_dir / "source.md").write_text(src_text, encoding="utf-8")
+        except Exception:
+            pass
+
+        # Create description.md based on metadata and paragraphs
+        fm_lines = [
+            "---",
+            f"title: {metadata.get('title', base_name)}",
+            f"date: {metadata.get('date', '')}",
+            f"theme: {metadata.get('theme', 'tech')}",
+            f"tags: {metadata.get('tags', [])}",
+            "---",
+            "",
+        ]
+        description_body = "\n\n".join(paragraphs) if paragraphs else metadata.get('title', base_name)
+        (project_dir / "description.md").write_text("\n".join(fm_lines) + description_body + "\n", encoding="utf-8")
+
+        # Create a simple index.md to navigate assets
+        index_md = f"""
+# {metadata.get('title', base_name)}
+
+![Thumbnail](thumbnail.jpg)
+
+- Video: [video.mp4](video.mp4)
+- Audio: [audio.mp3](audio.mp3)
+{('- Short: [short.mp4](short.mp4)\n' if shorts_path and os.path.exists(shorts_path) else '')}- Description: [description.md](description.md)
+"""
+        (project_dir / "index.md").write_text(index_md.strip() + "\n", encoding="utf-8")
+
+    def build_output_index(self):
+        """Build output/README.md summary with links and thumbnails to projects."""
+        projects_root = self.output_dir / "projects"
+        projects_root.mkdir(parents=True, exist_ok=True)
+        items = []
+        for p in sorted(projects_root.glob("*/")):
+            name = p.name
+            title = name
+            desc_path = p / "description.md"
+            if desc_path.exists():
+                try:
+                    import frontmatter
+                    post = frontmatter.load(desc_path)
+                    title = post.metadata.get('title', name)
+                except Exception:
+                    pass
+            items.append({
+                'name': name,
+                'title': title,
+                'thumb': f"projects/{name}/thumbnail.jpg",
+                'video': f"projects/{name}/video.mp4",
+                'index': f"projects/{name}/index.md",
+            })
+
+        lines = [
+            "# Output Projects Index",
+            "",
+            "Kliknij miniaturkę, aby obejrzeć wideo lub wejdź do projektu:",
+            "",
+        ]
+        for it in items:
+            lines.append(f"## {it['title']}")
+            lines.append("")
+            lines.append(f"[![{it['title']}]({it['thumb']})]({it['video']})")
+            lines.append("")
+            lines.append(f"- Projekt: [{it['name']}]({it['index']})")
+            lines.append("")
+
+        (self.output_dir / "README.md").write_text("\n".join(lines).strip() + "\n", encoding="utf-8")
 
 if __name__ == "__main__":
     try:
