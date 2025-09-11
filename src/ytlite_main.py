@@ -20,6 +20,7 @@ from dependencies import verify_dependencies
 from content_parser import ContentParser
 from audio_generator import AudioGenerator
 from video_generator import VideoGenerator
+from svg_packager import build_svg
 
 # Load environment variables
 load_dotenv()
@@ -250,6 +251,9 @@ class YTLite:
         (project_dir / "description.md").write_text("\n".join(fm_lines) + description_body + "\n", encoding="utf-8")
 
         # Create a simple index.md to navigate assets
+        svg_path = build_svg(project_dir, metadata, paragraphs, video_path, audio_path, thumbnail_path)
+
+        # Create a simple index.md to navigate assets
         index_md = f"""
 # {metadata.get('title', base_name)}
 
@@ -258,6 +262,7 @@ class YTLite:
 - Video: [video.mp4](video.mp4)
 - Audio: [audio.mp3](audio.mp3)
 {('- Short: [short.mp4](short.mp4)\n' if shorts_path and os.path.exists(shorts_path) else '')}- Description: [description.md](description.md)
+- SVG (single-file package): [{svg_path.name}]({svg_path.name})
 """
         (project_dir / "index.md").write_text(index_md.strip() + "\n", encoding="utf-8")
 
