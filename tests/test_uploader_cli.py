@@ -42,7 +42,7 @@ def test_upload_project_uses_env_and_privacy(monkeypatch, tmp_path):
     monkeypatch.setattr(yu, "SimpleYouTubeUploader", lambda *a, **k: fake)
 
     runner = CliRunner()
-    result = runner.invoke(yu.cli, ["upload-project", project, "--privacy", "public"])
+    result = runner.invoke(yu.cli, ["upload-project", "--project", project, "--privacy", "public"])
     assert result.exit_code == 0, result.output
     # The fake captured call arguments
     assert fake.last["video"].endswith("/video.mp4")

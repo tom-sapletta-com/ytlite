@@ -344,49 +344,21 @@ def upload(batch, folder):
         console.print("[yellow]Use --batch flag to upload all videos[/]")
 
 @cli.command()
-@click.argument('project')
-@click.option('--privacy', default=None, help='Privacy setting for upload (public, private, unlisted)')
-def upload_project(project, privacy):
-    """Upload a project video to YouTube"""
-    uploader = SimpleYouTubeUploader()
-    project_dir = Path('output') / 'projects' / project
-    video_file = project_dir / 'video.mp4'
-    desc_file = project_dir / 'description.md'
-    
-    if not video_file.exists():
-        console.print(f"[red]Error: Video file not found at {video_file}[/]")
-        return 1
-    
-    desc = ""
-    title = project
-    if desc_file.exists():
-        desc_text = desc_file.read_text(encoding='utf-8')
-        parsed = parse_markdown_metadata(desc_text)
-        desc = parsed.get('content', desc_text)
-        title = parsed.get('metadata', {}).get('title', project)
-    
-    # Check for .env in project dir for privacy setting
-    env_file = project_dir / '.env'
-    if env_file.exists():
-        from dotenv import load_dotenv
-        load_dotenv(env_file)
-        env_privacy = os.getenv('UPLOAD_PRIVACY')
-        if env_privacy and privacy is None:
-            privacy = env_privacy
-    
-    console.print(f"[yellow]Uploading {video_file} as {title}...[/]")
-    if privacy:
-        console.print(f"[yellow]Privacy setting: {privacy}[/]")
-    result = uploader.upload_video(video_file, title, desc, privacy=privacy)
-    if result:
-        console.print(f"[bold green]✓ Uploaded:[/] {result}")
-    else:
-        console.print("[red]Upload failed.[/]")
-    return 0 if result else 1
-
-@cli.command()
 @click.option('--project', required=True, help='Project name under output/projects/<project>')
 @click.option('--privacy', default=None, help='Privacy status (defaults to env UPLOAD_PRIVACY or unlisted)')
+def upload_project(project, privacy):
+    """Upload a single project's video using per-project .env for multi-account support."""
+    proj_dir = Path('output/projects')/project
+    if not proj_dir.exists():
+        console.print(f"[red]Project folder not found: {proj_dir}[/]")
+        raise SystemExit(1)
+    # Load per-project env first, then root .env fallback
+    env_path = proj_dir/'.env'
+    if env_path.exists():
+        load_dotenv(env_path)
+    else:
+        console.print("[yellow]No per-project .env found; falling back to root .env[/]")
+
     video = proj_dir/'video.mp4'
     desc_md = proj_dir/'description.md'
     title = project.replace('_', ' ').title()
