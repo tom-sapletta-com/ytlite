@@ -183,7 +183,7 @@ async function loadProjects() {
     if (data.projects && data.projects.length > 0) {
       container.innerHTML = '<div class="projects-grid">' + 
         data.projects.map(project => 
-          '<div class="project-card" onclick="selectProject(\'' + project.name + '\')">' +
+          '<div class="project-card" onclick="selectProject(\\\'' + project.name + '\\\')">' +
             '<div class="project-title">' + project.name + '</div>' +
             '<div class="project-meta">' + (project.svg ? '📄 SVG Package' : '📁 Files') + '</div>' +
             '<div class="project-actions">' + 
@@ -322,15 +322,19 @@ def output_index():
         return p.read_text(encoding='utf-8'), 200, {'Content-Type': 'text/markdown; charset=utf-8'}
     return 'No output yet', 404
 
-@app.route('/files/<path:filename>')
-def files(filename):
-    """Serve files from output directory"""
-    return send_from_directory(OUTPUT_DIR, filename)
-
 @app.route('/favicon.ico')
 def favicon():
-    """Serve favicon to prevent 404 errors"""
+    """Handle favicon requests"""
     return '', 204
+
+@app.route('/files/<path:filepath>')
+def serve_file(filepath):
+    """Serve files from output directory"""
+    try:
+        return send_from_directory(OUTPUT_DIR, filepath)
+    except Exception as e:
+        logger.error(f"Error serving file {filepath}: {e}")
+        return f"File not found: {filepath}", 404
 
 @app.route('/api/generate', methods=['POST'])
 def api_generate():

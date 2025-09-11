@@ -130,13 +130,13 @@ gui: ## Run Web GUI (Flask) on http://localhost:5000
 
 stop: ## Stop all running servers and processes
 	@echo "$(YELLOW)Stopping all servers and processes...$(NC)"
-	@pkill -f "python3.*web_gui" 2>/dev/null || true
-	@pkill -f "python3.*minimal_web_gui" 2>/dev/null || true
-	@pkill -f "python3.*simple_test_server" 2>/dev/null || true
-	@pkill -f "python3 -m http.server" 2>/dev/null || true
-	@pkill -f "python3.*-c.*Flask" 2>/dev/null || true
-	@lsof -ti:5000 | xargs kill -9 2>/dev/null || true
-	@lsof -ti:8080 | xargs kill -9 2>/dev/null || true
+	-@pkill -f "python3.*web_gui" 2>/dev/null
+	-@pkill -f "python3.*minimal_web_gui" 2>/dev/null
+	-@pkill -f "python3.*simple_test_server" 2>/dev/null
+	-@pkill -f "python3 -m http.server" 2>/dev/null
+	-@pkill -f "python3.*-c.*Flask" 2>/dev/null
+	-@lsof -ti:5000 | xargs -r kill -9 2>/dev/null
+	-@lsof -ti:8080 | xargs -r kill -9 2>/dev/null
 	@echo "$(GREEN)✅ All servers stopped$(NC)"
 
 logs: ## Show last 200 lines of logs/ytlite.log
@@ -156,9 +156,3 @@ validate-data-report:
 	@python3 -m src.validator
 	@echo "Data validation complete. Check reports in the 'reports' directory."
 
-# Help target to show available commands
-help:
-	@echo "Available commands:"
-	@echo "  make validate-app-report    - Validate application setup and dependencies"
-	@echo "  make validate-data-report   - Validate data integrity"
-	@echo "  make help            - Show this help message"
