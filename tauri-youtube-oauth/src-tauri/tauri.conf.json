@@ -1,9 +1,9 @@
 {
   "build": {
-    "beforeDevCommand": "",
+    "beforeDevCommand": "mkdir -p /app/dist && echo 'Directory created'",
     "beforeBuildCommand": "npm run build:frontend",
-    "devPath": "/home/tom/github/tom-sapletta-com/ytlite/tauri-youtube-oauth/dist",
-    "distDir": "/home/tom/github/tom-sapletta-com/ytlite/tauri-youtube-oauth/dist"
+    "devPath": "/app/dist",
+    "distDir": "/app/dist"
   },
   "package": {
     "productName": "tauri-youtube-oauth",

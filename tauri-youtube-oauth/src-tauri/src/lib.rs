@@ -137,7 +137,7 @@ async fn exchange_code(app: AppHandle, code: String) -> Result<Tokens, String> {
 }
 
 #[tauri::command]
-pub async fn check_tokens(app: AppHandle) -> Result<Tokens, String> {
+async fn check_tokens(app: AppHandle) -> Result<Tokens, String> {
   Ok(read_tokens(&app).unwrap_or_default())
 }
 
@@ -258,4 +258,3 @@ pub fn run() {
     .run(tauri::generate_context!())
     .expect("error while running tauri application");
 }
-

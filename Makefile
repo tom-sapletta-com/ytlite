@@ -1,4 +1,4 @@
-.PHONY: help install clean generate shorts upload publish docker-build docker-run preview daily test gui
+.PHONY: help install clean generate shorts upload upload-project publish docker-build docker-run preview daily test gui
 
 # Colors for output
 GREEN := \033[0;32m
@@ -32,8 +32,11 @@ generate: ## Generate videos from markdown content
 shorts: ## Create YouTube Shorts from existing videos
 	bash scripts/shorts.sh
 
-upload: ## Upload videos to YouTube
-	bash scripts/upload.sh
+upload: ## Upload generated videos to YouTube
+	@bash scripts/upload.sh
+
+upload-project: ## Upload a single project's video (usage: make upload-project PROJECT=<name> [PRIVACY=unlisted])
+	@python3 -u src/youtube_uploader.py upload_project --project $(PROJECT) $(if $(PRIVACY),--privacy $(PRIVACY),)
 
 publish: generate shorts ## Full pipeline: generate + shorts + upload (no upload by default)
 	bash scripts/publish.sh
