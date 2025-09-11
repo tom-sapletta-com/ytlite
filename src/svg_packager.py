@@ -113,8 +113,8 @@ def update_svg_media(svg_path: str | Path, video_path: Optional[str] = None,
         meta.setdefault("media", {})["thumbnail_jpg"] = _b64_data_uri(Path(thumb_path), "image/jpeg")
         # Also update visible image href
         new_thumb = meta["media"]["thumbnail_jpg"]
-        txt = re.sub(r"(<image[^>]*id=\"thumb\"[^>]*href=\")[^"]*(\")",
-                     r"\\1" + new_thumb + r"\\2", txt)
+        txt = re.sub(r'(<image[^>]*id="thumb"[^>]*href=")[^"]*(")',
+                     r'\1' + new_thumb + r'\2', txt)
     # Write back
     new_json = json.dumps(meta, ensure_ascii=False).replace("<", "&lt;")
     new_txt = txt[:m.start(1)] + new_json + txt[m.end(1):]

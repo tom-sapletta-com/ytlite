@@ -69,13 +69,22 @@ class VideoGenerator:
         console.print("[yellow]Warning: Could not load font, using default[/]")
         return ImageFont.load_default()
 
+    def _parse_hex(self, hexstr: str) -> tuple[int, int, int]:
+        s = hexstr.lstrip('#')
+        if len(s) == 3:
+            s = ''.join([c*2 for c in s])
+        try:
+            return int(s[0:2], 16), int(s[2:4], 16), int(s[4:6], 16)
+        except Exception:
+            return (30, 30, 46)
+
     def _draw_gradient_bg(self, img: Image.Image, start: str = "#1e1e2e", end: str = "#3b3b5b"):
         w, h = img.size
         draw = ImageDraw.Draw(img)
+        sr, sg, sb = self._parse_hex(start)
+        er, eg, eb = self._parse_hex(end)
         for y in range(h):
             ratio = y / max(1, h - 1)
-            sr, sg, sb = ImageColor.getrgb(start) if hasattr(Image, 'Color') else (30, 30, 46)
-            er, eg, eb = ImageColor.getrgb(end) if hasattr(Image, 'Color') else (59, 59, 91)
             r = int(sr + (er - sr) * ratio)
             g = int(sg + (eg - sg) * ratio)
             b = int(sb + (eb - sb) * ratio)
@@ -99,10 +108,6 @@ class VideoGenerator:
 
         # Optional gradient background
         if template == "gradient":
-            try:
-                from PIL import ImageColor  # type: ignore
-            except Exception:
-                ImageColor = None  # type: ignore
             try:
                 # Use darker/lighter variant if available
                 self._draw_gradient_bg(img, bg_color, theme_config.get("bg_color_2", "#3b3b5b"))

@@ -27,6 +27,7 @@ from ytlite_main import YTLite
 from wordpress_publisher import WordPressPublisher
 from storage_nextcloud import NextcloudClient
 from logging_setup import get_logger
+from progress import load_progress
 
 console = Console()
 app = Flask(__name__)
@@ -50,6 +51,7 @@ INDEX_HTML = """
     .col { flex: 1; }
     .preview { margin-top: 16px; }
     video { width: 100%; max-width: 720px; }
+    progress { width: 100%; height: 20px; }
   </style>
 </head>
 <body>
@@ -62,6 +64,45 @@ INDEX_HTML = """
 
     <label>Markdown content</label>
     <textarea id="markdown" placeholder="---\ntitle: Mój Film\ndate: 2025-01-01\n---\n\nTreść filmu...\n"></textarea>
+
+    <div class="row">
+      <div class="col">
+        <label>Voice</label>
+        <select id="voice">
+          <option value="pl-PL-MarekNeural">pl-PL-MarekNeural</option>
+          <option value="pl-PL-ZofiaNeural">pl-PL-ZofiaNeural</option>
+          <option value="de-DE-KillianNeural">de-DE-KillianNeural</option>
+          <option value="de-DE-KatjaNeural">de-DE-KatjaNeural</option>
+          <option value="en-US-GuyNeural">en-US-GuyNeural</option>
+          <option value="en-US-AriaNeural">en-US-AriaNeural</option>
+        </select>
+      </div>
+      <div class="col">
+        <label>Theme</label>
+        <select id="theme">
+          <option value="tech">tech</option>
+          <option value="philosophy">philosophy</option>
+          <option value="wetware">wetware</option>
+        </select>
+      </div>
+      <div class="col">
+        <label>Template</label>
+        <select id="template">
+          <option value="classic">classic</option>
+          <option value="gradient">gradient</option>
+          <option value="boxed">boxed</option>
+          <option value="left">left</option>
+        </select>
+      </div>
+      <div class="col">
+        <label>Font size</label>
+        <input id="font_size" type="text" placeholder="48" />
+      </div>
+      <div class="col">
+        <label>Lang</label>
+        <input id="lang" type="text" placeholder="pl" />
+      </div>
+    </div>
 
     <label>Upload .env (optional, per-project)</label>
     <input id="envfile" type="file" accept=".env" />
@@ -84,6 +125,22 @@ INDEX_HTML = """
     <button onclick="fetchNC()">Fetch to content/episodes/</button>
   </div>
 
+  <div class="box" id="progressBox" style="display:none">
+    <h2>Progress</h2>
+    <div id="progmsg">Waiting...</div>
+    <progress id="progbar" value="0" max="100"></progress>
+  </div>
+
+  <div class="box">
+    <h2>3) WordPress (optional, multiple targets)</h2>
+    <label>WordPress URL</label>
+    <input id="wp_url" type="text" placeholder="https://example.com" />
+    <label>Username</label>
+    <input id="wp_user" type="text" />
+    <label>App Password</label>
+    <input id="wp_pass" type="text" />
+  </div>
+
   <div class="box preview" id="preview" style="display:none">
     <h2>Preview</h2>
     <div id="links"></div>
@@ -95,14 +152,37 @@ INDEX_HTML = """
 async function generate() {
   const project = document.getElementById('project').value.trim();
   const markdown = document.getElementById('markdown').value;
+  const voice = document.getElementById('voice').value;
+  const theme = document.getElementById('theme').value;
+  const template = document.getElementById('template').value;
+  const font_size = document.getElementById('font_size').value.trim();
+  const lang = document.getElementById('lang').value.trim();
   const envfile = document.getElementById('envfile').files[0];
   if (!project) { alert('Podaj nazwę projektu'); return; }
   const fd = new FormData();
   fd.append('project', project);
   fd.append('markdown', markdown);
+  fd.append('voice', voice);
+  fd.append('theme', theme);
+  fd.append('template', template);
+  if (font_size) fd.append('font_size', font_size);
+  if (lang) fd.append('lang', lang);
   if (envfile) fd.append('env', envfile);
+  document.getElementById('progressBox').style.display = '';
+  const timer = setInterval(async () => {
+    try {
+      const pr = await fetch(`/api/progress?project=${encodeURIComponent(project)}`);
+      if (pr.ok) {
+        const p = await pr.json();
+        document.getElementById('progmsg').textContent = p.message || p.step || '';
+        document.getElementById('progbar').value = p.percent || 0;
+      }
+    } catch (e) {}
+  }, 500);
+
   const res = await fetch('/api/generate', { method:'POST', body: fd });
   const data = await res.json();
+  clearInterval(timer);
   if (!res.ok) { alert('Error: '+(data.message||res.status)); return; }
   document.getElementById('preview').style.display = '';
   document.getElementById('links').innerHTML = `
@@ -116,7 +196,16 @@ async function generate() {
 async function publishWP() {
   const project = document.getElementById('project').value.trim();
   if (!project) { alert('Podaj nazwę projektu'); return; }
-  const res = await fetch('/api/publish_wordpress', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ project })});
+  const wp_url = document.getElementById('wp_url').value.trim();
+  const wp_user = document.getElementById('wp_user').value.trim();
+  const wp_pass = document.getElementById('wp_pass').value.trim();
+  const payload = { project };
+  if (wp_url && wp_user && wp_pass) {
+    payload.base_url = wp_url;
+    payload.username = wp_user;
+    payload.app_password = wp_pass;
+  }
+  const res = await fetch('/api/publish_wordpress', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)});
   const data = await res.json();
   if (!res.ok) { alert('Error: '+(data.message||res.status)); return; }
   alert('Published: '+(data.link || JSON.stringify(data)));
@@ -191,7 +280,16 @@ def api_generate():
             md_path = Path('content/episodes')/f"{project}.md"
             md_path.parent.mkdir(parents=True, exist_ok=True)
             if not markdown.lstrip().startswith('---'):
-                markdown = f"---\ntitle: {project}\ndate: {datetime.now().date()}\n---\n\n" + markdown
+                # Build frontmatter from selections
+                fm = ["---", f"title: {project}", f"date: {datetime.now().date()}"]
+                v = request.form.get('voice');    t = request.form.get('template'); th = request.form.get('theme'); fs = request.form.get('font_size'); lg = request.form.get('lang')
+                if th: fm.append(f"theme: {th}")
+                if t: fm.append(f"template: {t}")
+                if fs: fm.append(f"font_size: {fs}")
+                if v: fm.append(f"voice: {v}")
+                if lg: fm.append(f"lang: {lg}")
+                fm.append("---\n")
+                markdown = "\n".join(fm) + "\n" + markdown
             md_path.write_text(markdown, encoding='utf-8')
             logger.info("Markdown written", extra={"path": str(md_path)})
         else:
@@ -230,7 +328,12 @@ def api_publish_wordpress():
         if env_path.exists():
             load_dotenv(env_path)
         logger.info("POST /api/publish_wordpress", extra={"project": project, "status": status})
-        pub = WordPressPublisher()
+        # Allow overriding creds via payload for multi-account publishing
+        pub = WordPressPublisher(
+            base_url=data.get('base_url'),
+            username=data.get('username'),
+            app_password=data.get('app_password'),
+        )
         result = pub.publish_project(str(proj_dir), publish_status=status)
         if not result:
             logger.error("Publish failed", extra={"project": project})
@@ -269,6 +372,15 @@ def api_fetch_nextcloud():
     except Exception as e:
         logger.error("POST /api/fetch_nextcloud failed", extra={"error": str(e)})
         return jsonify({'message': str(e)}), 500
+
+@app.route('/api/progress')
+def api_progress():
+    project = request.args.get('project', '').strip()
+    if not project:
+        return jsonify({}), 400
+    prog = load_progress(project, OUTPUT_DIR)
+    return jsonify(prog or {})
+
 
 if __name__ == '__main__':
     # Optionally verify deps at startup
