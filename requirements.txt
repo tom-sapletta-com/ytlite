@@ -25,4 +25,4 @@ watchdog>=3.0.0
 
 # Optional advanced features
 openai-whisper>=20231117
-numpy>=1.24.0
+numpy>=1.24.0,<2.3
