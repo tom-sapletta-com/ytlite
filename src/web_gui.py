@@ -29,6 +29,8 @@ from storage_nextcloud import NextcloudClient
 
 console = Console()
 app = Flask(__name__)
+BASE_DIR = Path(__file__).resolve().parent.parent
+OUTPUT_DIR = BASE_DIR / 'output'
 
 INDEX_HTML = """
 <!doctype html>
@@ -138,15 +140,15 @@ def index():
 @app.route('/output-index')
 def output_index():
     # Serve the output README via Flask if nginx isn't running
-    p = Path('output/README.md')
+    p = OUTPUT_DIR / 'README.md'
     if p.exists():
         return p.read_text(encoding='utf-8'), 200, {'Content-Type': 'text/markdown; charset=utf-8'}
     return 'No output yet', 404
 
 @app.route('/files/<path:subpath>')
 def files(subpath: str):
-    # Serve files from output/ directory for preview inside GUI
-    return send_from_directory('output', subpath, as_attachment=False)
+    # Serve files from output/ directory for preview inside GUI (absolute path)
+    return send_from_directory(str(OUTPUT_DIR), subpath, as_attachment=False)
 
 @app.route('/api/generate', methods=['POST'])
 def api_generate():

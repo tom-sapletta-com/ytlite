@@ -7,6 +7,7 @@ python-frontmatter>=1.0.1
 edge-tts>=6.1.9
 moviepy>=1.0.3
 pillow>=10.2.0
+imageio-ffmpeg>=0.4.9
 
 # YouTube API
 google-api-python-client>=2.108.0

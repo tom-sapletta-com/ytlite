@@ -20,18 +20,42 @@ class ContentParser:
         console.print(f"[cyan]Parsing {file_path}...[/]")
         
         with open(file_path, 'r', encoding='utf-8') as f:
-            post = frontmatter.load(f)
-        
-        # Extract metadata
+            raw_text = f.read()
+
+        # Try robust frontmatter parse; fall back to raw content if YAML is invalid
+        post_meta = {}
+        post_content = ""
+        try:
+            post = frontmatter.loads(raw_text)
+            post_meta = post.metadata or {}
+            post_content = (post.content or "").strip()
+        except Exception as e:
+            console.print(f"[yellow]Warning: Invalid frontmatter in {file_path}: {e}. Falling back to raw content.[/]")
+            # Remove frontmatter block if present (--- ... ---)
+            text = raw_text
+            lines = text.splitlines()
+            if lines and lines[0].strip() == '---':
+                # find closing '---'
+                idx = 1
+                while idx < len(lines) and lines[idx].strip() != '---':
+                    idx += 1
+                if idx < len(lines):
+                    post_content = "\n".join(lines[idx+1:]).strip()
+                else:
+                    post_content = "\n".join(lines[1:]).strip()
+            else:
+                post_content = text.strip()
+
+        # Extract metadata with defaults
         metadata = {
-            'title': post.metadata.get('title', Path(file_path).stem),
-            'date': post.metadata.get('date', datetime.now().strftime('%Y-%m-%d')),
-            'theme': post.metadata.get('theme', 'tech'),
-            'tags': post.metadata.get('tags', []),
+            'title': post_meta.get('title', Path(file_path).stem),
+            'date': post_meta.get('date', datetime.now().strftime('%Y-%m-%d')),
+            'theme': post_meta.get('theme', 'tech'),
+            'tags': post_meta.get('tags', []),
         }
         
         # Split content into paragraphs
-        content = post.content.strip()
+        content = post_content
         paragraphs = [p.strip() for p in content.split('\n\n') if p.strip()]
         
         if not paragraphs:

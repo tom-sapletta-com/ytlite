@@ -106,9 +106,12 @@ class WordPressPublisher:
         else:
             body_md = title
 
-        # Build HTML content
-        video_url = f"/output/projects/{p.name}/video.mp4"  # adjust if behind reverse proxy
-        audio_url = f"/output/projects/{p.name}/audio.mp3"
+        # Build HTML content - allow absolute links via PUBLIC_BASE_URL
+        public_base = os.getenv("PUBLIC_BASE_URL", "").rstrip("/")
+        rel_video = f"/output/projects/{p.name}/video.mp4"
+        rel_audio = f"/output/projects/{p.name}/audio.mp3"
+        video_url = f"{public_base}{rel_video}" if public_base else rel_video
+        audio_url = f"{public_base}{rel_audio}" if public_base else rel_audio
         content_md = body_md + "\n\n" + f"[Pobierz audio]({audio_url})"
         content_html = md_to_html(content_md)
         # Embed video via HTML tag

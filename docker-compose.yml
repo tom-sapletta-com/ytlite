@@ -19,6 +19,25 @@ services:
     networks:
       - ytlite-network
 
+  webgui:
+    image: ytlite:app
+    container_name: ytlite-webgui
+    volumes:
+      - .:/app
+      - ./output:/app/output
+      - ./logs:/app/logs
+    environment:
+      - PYTHONUNBUFFERED=1
+      - DEBUG=${DEBUG:-0}
+    command: ["python3", "src/web_gui.py"]
+    ports:
+      - "5000:5000"
+    depends_on:
+      - ytlite-base
+    profiles: ["gui"]
+    networks:
+      - ytlite-network
+
   ytlite-base:
     build:
       context: .

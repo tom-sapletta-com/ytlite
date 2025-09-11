@@ -78,6 +78,75 @@ make upload
 make preview  # http://localhost:8080
 ```
 
+## Web GUI (real‑time) — generowanie z podglądem
+
+- Uruchom: `make gui`
+- Otwórz: http://localhost:5000
+- Funkcje:
+  - Generowanie pojedynczego projektu „na żywo” z podglądem wideo i miniatury
+  - Wgrywanie per‑projektowego pliku `.env` (isolated credentials) podczas generacji
+  - Publikacja na WordPress (REST API, post jako draft/domyslnie)
+  - Pobieranie plików markdown z Nextcloud (WebDAV)
+  - Przegląd wygenerowanych plików przez GUI (video, audio, index.md)
+
+Powiązania z podglądem NGINX:
+- Równolegle możesz uruchomić `make preview` (http://localhost:8080) do przeglądania całego `output/`.
+- Jeśli ustawisz `PUBLIC_BASE_URL` (np. `http://localhost:8080`), linki w postach WordPress będą absolutne.
+
+### Publikacja na WordPress przez GUI
+Wymagane zmienne w `.env` (per‑project lub globalnie):
+- `WORDPRESS_URL` — np. `https://twoj‑wordpress.pl`
+- `WORDPRESS_USERNAME`
+- `WORDPRESS_APP_PASSWORD` — Application Password użytkownika WP
+- (opcjonalnie) `PUBLIC_BASE_URL` — np. `http://localhost:8080`
+
+GUI umieszcza miniaturę w Media Library i tworzy post z treścią z `description.md`, linkami do audio i osadzonym wideo.
+
+### Integracja z Nextcloud (WebDAV)
+W GUI podaj ścieżkę zdalną (np. `/YT/content/materiał.md`) i kliknij „Fetch to content/episodes/”.
+Zmienne w `.env` (per‑project lub globalnie):
+- `NEXTCLOUD_URL`, `NEXTCLOUD_USERNAME`, `NEXTCLOUD_PASSWORD`
+
+### Upload na YouTube — per projekt i per konto
+- Cel Makefile: `make upload-project PROJECT=<nazwa> [PRIVACY=public|unlisted|private]`
+- Mechanizm ładuje najpierw `output/projects/<nazwa>/.env`, a potem globalne `.env`.
+
+## Per‑project `.env` (multi‑account)
+
+Umieść w `output/projects/<projekt>/.env`. Ten plik ma pierwszeństwo przed globalnym `.env`.
+Przykładowe klucze:
+
+```env
+# YouTube
+YOUTUBE_CLIENT_ID=...
+YOUTUBE_CLIENT_SECRET=...
+UPLOAD_PRIVACY=unlisted
+
+# WordPress
+WORDPRESS_URL=https://twoj‑wordpress.pl
+WORDPRESS_USERNAME=twoj_login
+WORDPRESS_APP_PASSWORD=app‑password‑wp
+PUBLIC_BASE_URL=http://localhost:8080
+
+# Nextcloud
+NEXTCLOUD_URL=https://cloud.example.com
+NEXTCLOUD_USERNAME=...
+NEXTCLOUD_PASSWORD=...
+
+# Audio/Voice (opcjonalnie)
+EDGE_TTS_VOICE=pl-PL-MarekNeural
+```
+
+CLI też obsługuje per‑project `.env` przy generacji (patrz `YTLite.generate_video()`), a GUI automatycznie ładuje `.env` wgrywany/znajdujący się w folderze projektu.
+
+## Walidacje danych i aplikacji
+
+- `make validate-app` — smoke test (zależności + szybka generacja + sprawdzenie pakietowania projektu)
+  - Raporty per‑projekt: `app_validate.json`, `app_validate.md` (w `output/projects/<nazwa>/`)
+- `make validate-data` — skanuje wszystkie projekty i tworzy raport integralności
+  - Globalny: `output/validate_data.json`
+  - Per‑projekt: `data_report.json`, `data_report.md`
+
 ## Praca z Dockerem 🐳
 
 Docker to zalecany sposób uruchamiania projektu. Eliminuje problemy z zależnościami i zapewnia spójne środowisko.
@@ -109,6 +178,21 @@ Docker to zalecany sposób uruchamiania projektu. Eliminuje problemy z zależno�
     ```bash
     make docker-down
     ```
+
+### Web GUI w Docker Compose
+
+Dodaliśmy usługę `webgui` (Flask) na porcie `5000`.
+
+```bash
+# Uruchom samą usługę GUI
+docker-compose --profile gui up -d webgui
+
+# Logi GUI
+docker-compose logs -f webgui
+
+# Przeglądarka
+open http://localhost:5000
+```
 
 ### Aplikacja Tauri (OAuth Helper)
 

@@ -96,18 +96,6 @@ async fn exchange_and_persist(cfg_dir: &Path, code: &str) -> Result<Tokens, Stri
   Ok(t)
 }
 
-#[tauri::command]
-pub async fn get_config(app: AppHandle) -> Result<Option<AppConfig>, String> {
-  Ok(read_config(&app))
-}
-
-#[tauri::command]
-pub async fn set_config(app: AppHandle, client_id: String, client_secret: String) -> Result<(), String> {
-  let cfg = AppConfig { client_id, client_secret };
-  write_config(&app, &cfg)
-}
-
-#[tauri::command]
 async fn start_oauth(app: AppHandle) -> Result<(), String> {
   let cfg = read_config(&app).ok_or("Brak konfiguracji klienta (Client ID/Secret)".to_string())?;
   let redirect = "http://127.0.0.1:14321/callback";
@@ -130,18 +118,11 @@ async fn start_oauth(app: AppHandle) -> Result<(), String> {
   Ok(())
 }
 
-#[tauri::command]
-async fn exchange_code(app: AppHandle, code: String) -> Result<Tokens, String> {
+pub async fn exchange_code(app: AppHandle, code: String) -> Result<Tokens, String> {
   let dir = app_config_dir(&app)?;
   exchange_and_persist(&dir, &code).await
 }
 
-#[tauri::command]
-async fn check_tokens(app: AppHandle) -> Result<Tokens, String> {
-  Ok(read_tokens(&app).unwrap_or_default())
-}
-
-#[tauri::command]
 async fn refresh_tokens(app: AppHandle) -> Result<Tokens, String> {
   let cfg = read_config(&app).ok_or("Brak konfiguracji klienta".to_string())?;
   let mut t = read_tokens(&app).ok_or("Brak zapisanych tokenów".to_string())?;
@@ -172,8 +153,7 @@ async fn refresh_tokens(app: AppHandle) -> Result<Tokens, String> {
   Ok(t)
 }
 
-#[tauri::command]
-async fn youtube_list_channels(app: AppHandle) -> Result<serde_json::Value, String> {
+pub async fn youtube_list_channels(app: AppHandle) -> Result<serde_json::Value, String> {
   let mut t = read_tokens(&app).ok_or("Brak tokenów — zaloguj się".to_string())?;
   // Auto refresh if expired (buffer 60s)
   if t.expires_in > 0 && now_secs().saturating_sub(t.created_at) + 60 > t.expires_in {
@@ -195,8 +175,7 @@ async fn youtube_list_channels(app: AppHandle) -> Result<serde_json::Value, Stri
   Ok(resp.json().await.map_err(|e| e.to_string())?)
 }
 
-#[tauri::command]
-async fn generate_env(app: AppHandle) -> Result<String, String> {
+pub async fn generate_env(app: AppHandle) -> Result<String, String> {
   let cfg = read_config(&app).unwrap_or_default();
   let t = read_tokens(&app).unwrap_or_default();
   Ok(format_env_text(&cfg, &t))
@@ -212,49 +191,9 @@ fn format_env_text(cfg: &AppConfig, t: &Tokens) -> String {
   )
 }
 
-pub fn run() {
-  tauri::Builder::default()
-    .invoke_handler(tauri::generate_handler![
-      get_config,
-      set_config,
-      start_oauth,
-      exchange_code,
-      check_tokens,
-      refresh_tokens,
-      youtube_list_channels,
-      generate_env
-    ])
-    .setup(|app| {
-      // Ensure config dir exists
-      if let Ok(dir) = app_config_dir(&app.handle()) { let _ = fs::create_dir_all(dir.clone());
-        // Spawn the OAuth callback server using the app's config dir
-        let tokens_file = dir.join("tokens.json");
-        let config_file = dir.join("oauth_config.json");
-        std::thread::spawn(move || {
-          let rt = tokio::runtime::Builder::new_multi_thread().enable_all().build().expect("tokio runtime");
-          rt.block_on(async move {
-            let route = warp::path("callback")
-              .and(warp::get())
-              .and(warp::query::<std::collections::HashMap<String, String>>())
-              .map(move |params: std::collections::HashMap<String, String>| {
-                let code = params.get("code").cloned();
-                let tokens_file = tokens_file.clone();
-                let config_file = config_file.clone();
-                tokio::spawn(async move {
-                  if let Some(code) = code {
-                    if let Ok(t) = exchange_and_persist(&config_file.parent().unwrap_or_else(|| std::path::Path::new(".")), &code).await {
-                      if let Ok(s) = serde_json::to_string_pretty(&t) { let _ = std::fs::write(&tokens_file, s); }
-                    }
-                  }
-                });
-                warp::reply::html("<html><body><h2>Autoryzacja zakończona. Możesz zamknąć to okno.</h2></body></html>")
-              });
-            warp::serve(route).run(([127, 0, 0, 1], 14321)).await;
-          });
-        });
-      }
-      Ok(())
-    })
-    .run(tauri::generate_context!())
-    .expect("error while running tauri application");
+// Removed duplicate import to fix build error
+// use tauri::AppHandle;
+
+pub fn setup() {
+    // Placeholder for future functionality
 }

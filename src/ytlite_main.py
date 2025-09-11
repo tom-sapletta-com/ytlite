@@ -65,6 +65,16 @@ class YTLite:
         """Generate video from markdown file"""
         console.print(f"[bold cyan]Processing: {markdown_path}[/bold cyan]")
         try:
+            # Load per-project .env if present (output/projects/<stem>/.env)
+            try:
+                base_for_env = Path(markdown_path).stem
+                env_path = self.output_dir / "projects" / base_for_env / ".env"
+                if env_path.exists():
+                    load_dotenv(env_path)
+                    console.print(f"[dim]Loaded per-project .env: {env_path}[/dim]")
+            except Exception:
+                pass
+
             console.print("Step 1: Parsing content...")
             metadata, paragraphs = self.content_parser.parse_markdown(markdown_path)
             console.print("Step 1: Done.")
