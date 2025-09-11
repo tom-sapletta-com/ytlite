@@ -2,7 +2,7 @@
   "build": {
     "beforeDevCommand": "",
     "beforeBuildCommand": "npm run build:frontend",
-    "devPath": "http://localhost:5180",
+    "devPath": "/home/tom/github/tom-sapletta-com/ytlite/tauri-youtube-oauth/dist",
     "distDir": "/home/tom/github/tom-sapletta-com/ytlite/tauri-youtube-oauth/dist"
   },
   "package": {

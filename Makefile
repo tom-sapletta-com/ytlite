@@ -1,4 +1,4 @@
-.PHONY: help install clean generate shorts upload publish docker-build docker-run preview daily test
+.PHONY: help install clean generate shorts upload publish docker-build docker-run preview daily test gui
 
 # Colors for output
 GREEN := \033[0;32m
@@ -118,3 +118,6 @@ publish-pypi: ## Publish project to PyPI
 # Quick content creation
 quick: ## Quick content from stdin (echo "content" | make quick)
 	@bash scripts/quick.sh
+
+gui: ## Run Web GUI (Flask) on http://localhost:5000
+	@bash scripts/gui.sh

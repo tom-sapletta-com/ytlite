@@ -51,13 +51,23 @@ STATUS="ok"
 if [ ${#MISSING[@]} -gt 0 ]; then STATUS="failed"; fi
 
 mkdir -p "$PROJECT_DIR"
+# Build JSON array for missing
+MISSING_JSON="[]"
+if [ ${#MISSING[@]} -gt 0 ]; then
+  MISSING_JOINED=""
+  for i in "${!MISSING[@]}"; do
+    if [ $i -gt 0 ]; then MISSING_JOINED+=" , "; fi
+    MISSING_JOINED+="\"${MISSING[$i]}\""
+  done
+  MISSING_JSON="[ ${MISSING_JOINED} ]"
+fi
 cat > "$REPORT_JSON" <<JSON
 {
   "timestamp": "$TIMESTAMP",
   "sample": "$SAMPLE_MD",
   "project": "$PROJECT_DIR",
   "required": ["video.mp4", "audio.mp3", "thumbnail.jpg", "description.md", "index.md"],
-  "missing": ["${MISSING[@]}"] ,
+  "missing": $MISSING_JSON,
   "status": "$STATUS"
 }
 JSON

@@ -343,5 +343,44 @@ def upload(batch, folder):
     else:
         console.print("[yellow]Use --batch flag to upload all videos[/]")
 
+@cli.command()
+@click.option('--project', required=True, help='Project name under output/projects/<project>')
+@click.option('--privacy', default=None, help='Privacy status (defaults to env UPLOAD_PRIVACY or unlisted)')
+def upload_project(project, privacy):
+    """Upload a single project's video using per-project .env for multi-account support."""
+    proj_dir = Path('output/projects')/project
+    if not proj_dir.exists():
+        console.print(f"[red]Project folder not found: {proj_dir}[/]")
+        raise SystemExit(1)
+    # Load per-project env first, then root .env fallback
+    env_path = proj_dir/'.env'
+    if env_path.exists():
+        load_dotenv(env_path)
+    else:
+        console.print("[yellow]No per-project .env found; falling back to root .env[/]")
+
+    video = proj_dir/'video.mp4'
+    desc_md = proj_dir/'description.md'
+    title = project.replace('_', ' ').title()
+    tags = []
+    if desc_md.exists():
+        try:
+            import frontmatter
+            post = frontmatter.load(desc_md)
+            title = post.metadata.get('title', title)
+            tags = post.metadata.get('tags', [])
+        except Exception:
+            pass
+    if not video.exists():
+        console.print(f"[red]Video not found: {video}[/]")
+        raise SystemExit(1)
+
+    uploader = SimpleYouTubeUploader()
+    if not uploader.youtube:
+        raise SystemExit(1)
+    url = uploader.upload_video(video, title=title, description=desc_md.read_text(encoding='utf-8') if desc_md.exists() else '', tags=tags, privacy=privacy)
+    if url:
+        console.print(f"[green]✓ Uploaded project {project}: {url}[/]")
+
 if __name__ == "__main__":
     cli()
