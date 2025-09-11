@@ -1,0 +1,390 @@
+#!/usr/bin/env python3
+"""
+Simple YouTube uploader - focuses on what matters
+"""
+
+import os
+import json
+import pickle
+from pathlib import Path
+from typing import Dict, Optional
+from datetime import datetime
+import platform
+
+from google.auth.transport.requests import Request
+from google.oauth2.credentials import Credentials
+from google_auth_oauthlib.flow import InstalledAppFlow
+from googleapiclient.discovery import build
+from googleapiclient.http import MediaFileUpload
+from rich.console import Console
+import frontmatter
+import click
+from dotenv import load_dotenv
+
+load_dotenv()
+
+console = Console()
+
+class SimpleYouTubeUploader:
+    """Minimal YouTube uploader"""
+    
+    SCOPES = ['https://www.googleapis.com/auth/youtube.upload']
+    
+    def __init__(self, credentials_file: str = "credentials/credentials.json"):
+        self.credentials_file = credentials_file
+        self.youtube = self._authenticate()
+    
+    def _authenticate(self):
+        """Simple OAuth2 flow"""
+        creds = None
+        token_file = 'credentials/token.pickle'
+        
+        # Load existing token
+        if os.path.exists(token_file):
+            with open(token_file, 'rb') as token:
+                creds = pickle.load(token)
+        
+        # Refresh or get new token
+        if not creds or not creds.valid:
+            if creds and creds.expired and creds.refresh_token:
+                creds.refresh(Request())
+            else:
+                # Try alternative path: use .env client credentials + tokens from Tauri app or env
+                alt_creds = self._load_credentials_from_env_or_tauri()
+                if alt_creds:
+                    creds = alt_creds
+                else:
+                    if not os.path.exists(self.credentials_file):
+                        console.print(f"[red]Error: {self.credentials_file} not found![/]")
+                        console.print("[yellow]Please download your YouTube API credentials from Google Cloud Console,\n"
+                                       "or use the Tauri OAuth app to generate tokens and set YOUTUBE_CLIENT_ID/SECRET in .env[/]")
+                        return None
+                    
+                    flow = InstalledAppFlow.from_client_secrets_file(
+                        self.credentials_file, self.SCOPES)
+                    creds = flow.run_local_server(port=0)
+            
+            # Save token
+            os.makedirs(os.path.dirname(token_file), exist_ok=True)
+            with open(token_file, 'wb') as token:
+                pickle.dump(creds, token)
+        
+        return build('youtube', 'v3', credentials=creds) if creds else None
+
+    def _tauri_config_dir(self) -> Path:
+        """Resolve Tauri app config dir path for identifier com.ytlite.oauth."""
+        ident = "com.ytlite.oauth"
+        system = platform.system().lower()
+        # Allow override via env
+        override = os.getenv("TAURI_CONFIG_DIR")
+        if override:
+            return Path(override)
+        if system == 'linux':
+            return Path.home() / ".config" / ident
+        elif system == 'darwin':  # macOS
+            return Path.home() / "Library" / "Application Support" / ident
+        else:  # Windows
+            appdata = os.getenv('APPDATA')
+            if appdata:
+                return Path(appdata) / ident
+            return Path.home() / "AppData" / "Roaming" / ident
+
+    def _load_credentials_from_env_or_tauri(self) -> Optional[Credentials]:
+        """Attempt to build Credentials from .env client details and tokens from Tauri or env.
+        Returns google.oauth2.credentials.Credentials or None."""
+        client_id = os.getenv("YOUTUBE_CLIENT_ID")
+        client_secret = os.getenv("YOUTUBE_CLIENT_SECRET")
+        if not client_id or not client_secret:
+            return None
+        # First, tokens via env (optional)
+        env_access = os.getenv("YOUTUBE_ACCESS_TOKEN", "")
+        env_refresh = os.getenv("YOUTUBE_REFRESH_TOKEN", "")
+        access_token = env_access
+        refresh_token = env_refresh
+        
+        # If no env tokens, try Tauri tokens.json
+        if not refresh_token:
+            tokens_file = self._tauri_config_dir() / "tokens.json"
+            if tokens_file.exists():
+                try:
+                    data = json.loads(tokens_file.read_text())
+                    access_token = data.get("access_token", "")
+                    refresh_token = data.get("refresh_token", "")
+                except Exception as e:
+                    console.print(f"[red]Failed to read Tauri tokens: {e}[/]")
+                    return None
+        
+        if not refresh_token and not access_token:
+            return None
+        
+        try:
+            creds = Credentials(
+                token=access_token or None,
+                refresh_token=refresh_token or None,
+                token_uri="https://oauth2.googleapis.com/token",
+                client_id=client_id,
+                client_secret=client_secret,
+                scopes=self.SCOPES,
+            )
+            # If only refresh token, let API refresh when needed
+            return creds
+        except Exception as e:
+            console.print(f"[red]Failed to construct Credentials from env/tauri: {e}[/]")
+            return None
+    
+    def upload_video(self, 
+                     video_path: Path,
+                     title: str,
+                     description: str = "",
+                     tags: list = None,
+                     category: str = "28",  # Science & Technology
+                     privacy: str = None) -> str:
+        """Upload video with minimal config"""
+        
+        if not self.youtube:
+            console.print("[red]YouTube authentication failed![/]")
+            return None
+            
+        console.print(f"[yellow]Uploading:[/] {title}")
+        
+        # Use privacy from env if not specified
+        if privacy is None:
+            privacy = os.getenv("UPLOAD_PRIVACY", "unlisted")
+        
+        # Auto-generate description if empty
+        if not description:
+            description = self._generate_description(title, tags)
+        
+        body = {
+            'snippet': {
+                'title': title,
+                'description': description,
+                'tags': tags or [],
+                'categoryId': category
+            },
+            'status': {
+                'privacyStatus': privacy,
+                'selfDeclaredMadeForKids': False,
+            }
+        }
+        
+        # Upload
+        media = MediaFileUpload(
+            str(video_path),
+            chunksize=-1,
+            resumable=True,
+            mimetype='video/mp4'
+        )
+        
+        try:
+            request = self.youtube.videos().insert(
+                part=','.join(body.keys()),
+                body=body,
+                media_body=media
+            )
+            
+            response = request.execute()
+            video_url = f"https://youtube.com/watch?v={response['id']}"
+            
+            console.print(f"[bold green]✓ Uploaded:[/] {video_url}")
+            
+            # Save URL for later reference
+            self._save_upload_record(video_path, video_url, response['id'])
+            
+            return video_url
+        except Exception as e:
+            console.print(f"[red]Upload failed: {e}[/]")
+            console.print("[yellow]Retrying upload once...[/]")
+            try:
+                request = self.youtube.videos().insert(
+                    part=','.join(body.keys()),
+                    body=body,
+                    media_body=media
+                )
+                response = request.execute()
+                video_url = f"https://youtube.com/watch?v={response['id']}"
+                console.print(f"[bold green]✓ Uploaded on retry:[/] {video_url}")
+                self._save_upload_record(video_path, video_url, response['id'])
+                return video_url
+            except Exception as retry_e:
+                console.print(f"[red]Retry failed: {retry_e}[/]")
+                return None
+    
+    def upload_shorts(self, 
+                      shorts_path: Path,
+                      original_title: str) -> str:
+        """Upload Shorts with #Shorts hashtag"""
+        
+        title = f"{original_title} #Shorts"
+        description = f"""
+{original_title} w 60 sekund!
+
+#Shorts #Tech #Philosophy #Wetware #EdgeComputing
+
+🧠 Subskrybuj, aby nie przegapić kolejnych przemyśleń!
+
+🔗 Więcej:
+→ Blog: https://wetware.dev
+→ GitHub: https://github.com/tom-sapletta-com
+→ LinkedIn: https://linkedin.com/in/tom-sapletta-com
+        """
+        
+        return self.upload_video(
+            shorts_path,
+            title,
+            description,
+            tags=["shorts", "tech", "philosophy"],
+            privacy=os.getenv("UPLOAD_PRIVACY", "public")
+        )
+    
+    def _generate_description(self, title: str, tags: list) -> str:
+        """Auto-generate engaging description"""
+        hashtags = ' '.join([f"#{tag}" for tag in (tags or [])])
+        
+        return f"""
+{title}
+
+🧠 Subskrybuj, aby nie przegapić kolejnych przemyśleń!
+
+🔗 Więcej:
+→ Blog: https://wetware.dev
+→ GitHub: https://github.com/tom-sapletta-com
+→ LinkedIn: https://linkedin.com/in/tom-sapletta-com
+
+{hashtags}
+
+#AI #Technology #Future #Innovation #Programming #DevOps
+        """
+    
+    def _save_upload_record(self, video_path: Path, url: str, video_id: str):
+        """Keep track of uploads"""
+        records_file = Path("output/upload_history.json")
+        
+        if records_file.exists():
+            with open(records_file, 'r') as f:
+                records = json.load(f)
+        else:
+            records = []
+        
+        records.append({
+            "file": str(video_path),
+            "url": url,
+            "id": video_id,
+            "uploaded_at": datetime.now().isoformat()
+        })
+        
+        records_file.parent.mkdir(exist_ok=True)
+        with open(records_file, 'w') as f:
+            json.dump(records, f, indent=2)
+    
+    def batch_upload(self, folder: Path = Path("output")):
+        """Upload all videos in folder"""
+        videos = list((folder / "videos").glob("*.mp4"))
+        shorts = list((folder / "shorts").glob("*.mp4"))
+        
+        console.print(f"[cyan]Found {len(videos)} videos and {len(shorts)} shorts[/]")
+        
+        # Upload main videos
+        for video in videos:
+            # Skip if already uploaded
+            if self._is_uploaded(video):
+                console.print(f"[dim]Skipping (already uploaded): {video.name}[/]")
+                continue
+            
+            # Extract metadata from filename or use defaults
+            title = video.stem.replace('_', ' ').title()
+            
+            # Try to load metadata from markdown
+            md_file = Path(f"content/episodes/{video.stem}.md")
+            if md_file.exists():
+                with open(md_file, 'r') as f:
+                    post = frontmatter.load(f)
+                    title = post.metadata.get('title', title)
+                    tags = post.metadata.get('tags', [])
+            else:
+                tags = ['tech', 'philosophy']
+            
+            self.upload_video(video, title, tags=tags)
+        
+        # Upload shorts
+        for short in shorts:
+            if self._is_uploaded(short):
+                continue
+            
+            original_title = short.stem.replace('_short', '').replace('_', ' ').title()
+            self.upload_shorts(short, original_title)
+    
+    def _is_uploaded(self, video_path: Path) -> bool:
+        """Check if video was already uploaded"""
+        records_file = Path("output/upload_history.json")
+        if not records_file.exists():
+            return False
+        
+        with open(records_file, 'r') as f:
+            records = json.load(f)
+        
+        return any(r['file'] == str(video_path) for r in records)
+
+
+@click.group()
+def cli():
+    """YouTube uploader CLI"""
+    pass
+
+@cli.command()
+@click.option('--batch', is_flag=True, help='Upload all videos in output folder')
+@click.option('--folder', default='output', help='Folder to upload from')
+def upload(batch, folder):
+    """Upload videos to YouTube"""
+    uploader = SimpleYouTubeUploader()
+    
+    if batch:
+        uploader.batch_upload(Path(folder))
+    else:
+        console.print("[yellow]Use --batch flag to upload all videos[/]")
+
+@cli.command()
+@click.option('--project', required=True, help='Project name under output/projects/<project>')
+@click.option('--privacy', default=None, help='Privacy status (defaults to env UPLOAD_PRIVACY or unlisted)')
+def upload_project(project, privacy):
+    print(Debug:
+    """Upload a single project's video using per-project .env for multi-account support."""
+    proj_dir = Path('output/projects')/project
+    if not proj_dir.exists():
+    print(Debug:
+        console.print(f"[red]Project folder not found: {proj_dir}[/]")
+        raise SystemExit(1)
+    # Load per-project env first, then root .env fallback
+    env_path = proj_dir/'.env'
+    if env_path.exists():
+        load_dotenv(env_path)
+    else:
+        console.print("[yellow]No per-project .env found; falling back to root .env[/]")
+
+    video = proj_dir/'video.mp4'
+    desc_md = proj_dir/'description.md'
+    title = project.replace('_', ' ').title()
+    tags = []
+    if desc_md.exists():
+        try:
+            import frontmatter
+            post = frontmatter.load(desc_md)
+            title = post.metadata.get('title', title)
+            tags = post.metadata.get('tags', [])
+        except Exception:
+            pass
+    if not video.exists():
+        console.print(f"[red]Video not found: {video}[/]")
+        raise SystemExit(1)
+
+    uploader = SimpleYouTubeUploader()
+    if not uploader.youtube:
+        raise SystemExit(1)
+    url = uploader.upload_video(video, title=title, description=desc_md.read_text(encoding='utf-8') if desc_md.exists() else '', tags=tags, privacy=privacy)
+    if url:
+        console.print(f"[green]✓ Uploaded project {project}: {url}[/]")
+    else:
+        console.print("[red]Upload failed.[/]")
+
+if __name__ == "__main__":
+    cli()

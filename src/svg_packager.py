@@ -67,28 +67,74 @@ def build_svg(project_dir: str | Path, metadata: dict, paragraphs: list,
         },
     }
 
-    # Compose SVG document
-    # Visible layer uses the thumbnail as image so the SVG is also the miniaturka
+    # Compose interactive SVG document with embedded video player and metadata display
     img_tag = (
-        f"<image id=\"thumb\" href=\"{thumb_uri}\" x=\"0\" y=\"0\" width=\"{width}\" height=\"{height}\"/>"
+        f"<image id=\"thumb\" href=\"{thumb_uri}\" x=\"0\" y=\"0\" width=\"{width}\" height=\"{height}\" style=\"cursor:pointer\"/>"
         if thumb_uri else ""
     )
     desc = ("\n\n".join(paragraphs)).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
     meta_json = json.dumps(meta, ensure_ascii=False)
     meta_json_esc = meta_json.replace("<", "&lt;")
+    
+    # Create interactive SVG with embedded video player and metadata display
     svg = f"""
-<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"{width}\" height=\"{height}\" viewBox=\"0 0 {width} {height}\">
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" 
+     width="{width}" height="{height}" viewBox="0 0 {width} {height}">
   <title>{metadata.get('title', name)}</title>
   <desc>{desc}</desc>
   <metadata>
-    <rdf:RDF xmlns:rdf=\"http://www.w3.org/1999/02/22-rdf-syntax-ns#\">
+    <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
       <rdf:Description>
-        <script type=\"application/json\">{meta_json_esc}</script>
+        <script type="application/json">{meta_json_esc}</script>
       </rdf:Description>
     </rdf:RDF>
   </metadata>
+  
+  <!-- Embedded HTML with video player and metadata -->
+  <foreignObject x="0" y="0" width="{width}" height="{height}">
+    <div xmlns="http://www.w3.org/1999/xhtml" style="width:100%; height:100%; font-family:Arial,sans-serif; background:#1a1a1a; color:#fff; overflow:auto;">
+      <div style="padding:20px;">
+        <!-- Video Player -->
+        <div style="text-align:center; margin-bottom:20px;">
+          <video id="mainVideo" controls autoplay style="max-width:100%; height:auto; background:#000;">
+            <source src="{video_uri}" type="video/mp4"/>
+            Your browser does not support the video tag.
+          </video>
+        </div>
+        
+        <!-- Title and Metadata -->
+        <h1 style="color:#00ff88; margin:0 0 10px 0; font-size:28px;">{metadata.get('title', name)}</h1>
+        <div style="background:#2a2a2a; padding:15px; border-radius:8px; margin-bottom:20px;">
+          <div style="display:grid; grid-template-columns:150px 1fr; gap:10px; font-size:14px;">
+            <strong>Date:</strong> <span>{meta.get('date', 'N/A')}</span>
+            <strong>Theme:</strong> <span>{meta.get('theme', 'N/A')}</span>
+            <strong>Template:</strong> <span>{meta.get('template', 'N/A')}</span>
+            <strong>Voice:</strong> <span>{meta.get('voice', 'N/A')}</span>
+            <strong>Language:</strong> <span>{meta.get('lang', 'N/A')}</span>
+            <strong>Created:</strong> <span>{meta.get('created_at', 'N/A')}</span>
+          </div>
+        </div>
+        
+        <!-- Content -->
+        <div style="background:#333; padding:15px; border-radius:8px; margin-bottom:20px;">
+          <h3 style="color:#00ff88; margin-top:0;">Content:</h3>
+          <div style="line-height:1.6;">{desc}</div>
+        </div>
+        
+        <!-- Audio Player -->
+        <div style="background:#2a2a2a; padding:15px; border-radius:8px;">
+          <h3 style="color:#00ff88; margin-top:0;">Audio:</h3>
+          <audio controls style="width:100%;">
+            <source src="{audio_uri}" type="audio/mpeg"/>
+            Your browser does not support the audio tag.
+          </audio>
+        </div>
+      </div>
+    </div>
+  </foreignObject>
+  
+  <!-- Fallback: thumbnail image for non-browser environments -->
   {img_tag}
-  <!-- Controls/overlays could be drawn here -->
 </svg>
 """.strip()
 

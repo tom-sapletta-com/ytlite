@@ -40,11 +40,10 @@ INDEX_HTML = """
 <!doctype html>
 <html>
 <head>
-  <meta charset="utf-8" />
   <title>YTLite Web GUI</title>
   <style>
-    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; margin: 20px; }
-    .box { border: 1px solid #ddd; padding: 16px; margin-bottom: 16px; border-radius: 8px; }
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; margin: 20px; background: #f5f5f5; }
+    .box { border: 1px solid #ddd; padding: 16px; margin-bottom: 16px; border-radius: 8px; background: white; }
     label { display:block; margin-top:8px; font-weight:bold; }
     textarea { width: 100%; height: 180px; }
     input[type=text] { width: 100%; }
@@ -53,13 +52,35 @@ INDEX_HTML = """
     .preview { margin-top: 16px; }
     video { width: 100%; max-width: 720px; }
     progress { width: 100%; height: 20px; }
+    .projects-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; margin-top: 20px; }
+    .project-card { border: 1px solid #ddd; border-radius: 8px; padding: 16px; background: white; cursor: pointer; transition: all 0.2s; }
+    .project-card:hover { border-color: #00ff88; box-shadow: 0 2px 8px rgba(0,255,136,0.2); }
+    .project-title { font-size: 18px; font-weight: bold; color: #333; margin-bottom: 8px; }
+    .project-meta { font-size: 14px; color: #666; margin-bottom: 12px; }
+    .project-actions { display: flex; gap: 8px; }
+    .btn { padding: 6px 12px; border: 1px solid #ddd; background: #f8f8f8; border-radius: 4px; cursor: pointer; text-decoration: none; font-size: 12px; }
+    .btn:hover { background: #e8e8e8; }
+    .btn-primary { background: #00ff88; border-color: #00ff88; color: white; }
+    .btn-primary:hover { background: #00cc66; }
+    .create-new { background: #007acc; color: white; padding: 20px; text-align: center; border-radius: 8px; margin-bottom: 20px; }
+    .create-new:hover { background: #0066aa; }
   </style>
 </head>
 <body>
-  <h1>YTLite Web GUI</h1>
+  <h1>🎬 YTLite Projects</h1>
+  
+  <div class="create-new" onclick="showCreateForm()">
+    <h2 style="margin: 0 0 8px 0;">➕ Create New Project</h2>
+    <p style="margin: 0;">Generate video content with AI voice and custom themes</p>
+  </div>
+  
+  <div id="existingProjects" class="box">
+    <h2>📁 Existing Projects</h2>
+    <div id="projectsList">Loading projects...</div>
+  </div>
 
-  <div class="box">
-    <h2>1) Project</h2>
+  <div id="createForm" class="box" style="display:none;">
+    <h2>1) Create New Project</h2>
     <label>Project name</label>
     <input id="project" type="text" placeholder="np. my_project" />
 
@@ -150,6 +171,66 @@ INDEX_HTML = """
   </div>
 
 <script>
+// Load existing projects on page load
+document.addEventListener('DOMContentLoaded', loadProjects);
+
+async function loadProjects() {
+  try {
+    const res = await fetch('/api/projects');
+    const data = await res.json();
+    const container = document.getElementById('projectsList');
+    
+    if (data.projects && data.projects.length > 0) {
+      container.innerHTML = '<div class="projects-grid">' + 
+        data.projects.map(project => 
+          '<div class="project-card" onclick="selectProject(\'' + project.name + '\')">' +
+            '<div class="project-title">' + project.name + '</div>' +
+            '<div class="project-meta">' + (project.svg ? '📄 SVG Package' : '📁 Files') + '</div>' +
+            '<div class="project-actions">' + 
+              (project.svg ? '<a href="/files/projects/' + project.name + '/' + project.svg + '" target="_blank" class="btn btn-primary">📄 Open SVG</a>' : '') +
+              '<a href="/files/projects/' + project.name + '/" target="_blank" class="btn">📂 Files</a>' +
+              '<button onclick="editProject(\'' + project.name + '\')" class="btn">✏️ Edit</button>' +
+            '</div>' +
+          '</div>'
+        ).join('') + '</div>';
+    } else {
+      container.innerHTML = '<p>No projects found. Create your first project!</p>';
+    }
+  } catch (e) {
+    console.error('Failed to load projects:', e);
+    document.getElementById('projectsList').innerHTML = '<p>Error loading projects.</p>';
+  }
+}
+
+function showCreateForm() {
+  document.getElementById('createForm').style.display = '';
+  document.getElementById('createForm').scrollIntoView({behavior: 'smooth'});
+}
+
+function selectProject(name) {
+  document.getElementById('project').value = name;
+  showCreateForm();
+}
+
+async function editProject(name) {
+  try {
+    const res = await fetch(`/api/svg_meta?project=${name}`);
+    if (res.ok) {
+      const meta = await res.json();
+      document.getElementById('project').value = name;
+      document.getElementById('markdown').value = (meta.paragraphs || []).join('\\n\\n');
+      if (meta.voice) document.getElementById('voice').value = meta.voice;
+      if (meta.theme) document.getElementById('theme').value = meta.theme;
+      if (meta.template) document.getElementById('template').value = meta.template;
+      if (meta.font_size) document.getElementById('font_size').value = meta.font_size;
+      if (meta.lang) document.getElementById('lang').value = meta.lang;
+      showCreateForm();
+    }
+  } catch (e) {
+    console.error('Failed to load project metadata:', e);
+  }
+}
+
 async function generate() {
   const project = document.getElementById('project').value.trim();
   const markdown = document.getElementById('markdown').value;
@@ -192,6 +273,8 @@ async function generate() {
     <a href="${data.urls.audio}" target="_blank">Audio</a></div>`;
   document.getElementById('vid').src = data.urls.video;
   document.getElementById('thumb').src = data.urls.thumb;
+  // Reload projects list
+  loadProjects();
 }
 
 async function publishWP() {
@@ -239,11 +322,15 @@ def output_index():
         return p.read_text(encoding='utf-8'), 200, {'Content-Type': 'text/markdown; charset=utf-8'}
     return 'No output yet', 404
 
-@app.route('/files/<path:subpath>')
-def files(subpath: str):
-    # Serve files from output/ directory for preview inside GUI (absolute path)
-    logger.info("GET /files", extra={"subpath": subpath})
-    return send_from_directory(str(OUTPUT_DIR), subpath, as_attachment=False)
+@app.route('/files/<path:filename>')
+def files(filename):
+    """Serve files from output directory"""
+    return send_from_directory(OUTPUT_DIR, filename)
+
+@app.route('/favicon.ico')
+def favicon():
+    """Serve favicon to prevent 404 errors"""
+    return '', 204
 
 @app.route('/api/generate', methods=['POST'])
 def api_generate():
