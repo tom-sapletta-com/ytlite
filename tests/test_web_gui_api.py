@@ -113,6 +113,11 @@ Test content for English voice Aria Neural.'''
     }
 ]
 
+THEMES = ['tech', 'philosophy', 'wetware']
+TEMPLATES = ['classic', 'gradient', 'boxed', 'left']
+FONT_SIZES = ['24', '36', '48', '64', '72', '96']
+LANGUAGES = ['pl', 'en', 'de', 'fr', 'es', 'it']
+
 @pytest.fixture
 def client():
     """Flask test client fixture."""
@@ -215,110 +220,93 @@ class TestWebGUIAPI:
         assert 'project' in data
         assert 'urls' in data
         
-    @patch('src.web_gui.generate_project')
-    def test_api_generate_all_voice_options(self, mock_generate, client):
+    def test_api_generate_all_voice_options(self, client):
         """Test all voice options through API."""
-        mock_generate.return_value = True
-        
         for test_case in TEST_COMBINATIONS:
             response = client.post('/api/generate', data=test_case)
             assert response.status_code == 200, f"Failed for voice: {test_case['voice']}"
+            data = response.get_json()
+            assert 'message' in data
+            assert data['message'] == 'Project generated successfully'
+            assert 'project' in data
+            assert 'urls' in data
             
-    @patch('src.web_gui.generate_project')
-    def test_api_generate_with_env_file(self, mock_generate, client, temp_env_file):
+    def test_api_generate_with_env_file(self, client, temp_env_file):
         """Test project generation with .env file upload."""
-        mock_generate.return_value = True
-        
         test_data = TEST_COMBINATIONS[0].copy()
-        
-        with open(temp_env_file, 'rb') as f:
-            test_data['env'] = (f, '.env')
-            
-            response = client.post('/api/generate', 
-                                 data=test_data,
-                                 content_type='multipart/form-data')
+        with open(temp_env_file, 'rb') as env_file:
+            test_data['env'] = env_file
+            response = client.post('/api/generate', content_type='multipart/form-data', data=test_data)
             assert response.status_code == 200
+            data = response.get_json()
+            assert 'message' in data
+            assert data['message'] == 'Project generated successfully'
+            assert 'project' in data
+            assert 'urls' in data
             
-    @patch('src.web_gui.generate_project')
-    def test_api_generate_json_content_type(self, mock_generate, client):
+    def test_api_generate_json_content_type(self, client):
         """Test API generation with JSON content type."""
-        mock_generate.return_value = True
-        
-        test_data = TEST_COMBINATIONS[0]
-        
-        response = client.post('/api/generate',
-                             json=test_data,
-                             content_type='application/json')
+        test_data = {
+            'project': 'test_json_project',
+            'markdown': '# Test JSON Content Type\nThis is a test markdown content.'
+        }
+        response = client.post('/api/generate', json=test_data, content_type='application/json')
         assert response.status_code == 200
+        data = response.get_json()
+        assert 'message' in data
+        assert data['message'] == 'Project generated successfully'
+        assert 'project' in data
+        assert 'urls' in data
         
-    def test_api_generate_missing_project_name(self, client):
-        """Test API generation without project name."""
-        response = client.post('/api/generate', data={
-            'markdown': 'test content',
-            'voice': 'en-US-AriaNeural'
-        })
-        assert response.status_code == 400
-        
-    @patch('src.web_gui.generate_project')
-    def test_api_generate_all_theme_combinations(self, mock_generate, client):
+    def test_api_generate_all_theme_combinations(self, client):
         """Test all theme and template combinations."""
-        mock_generate.return_value = True
-        
-        themes = ['tech', 'philosophy', 'wetware']
-        templates = ['classic', 'gradient', 'boxed', 'left']
-        
-        for theme in themes:
-            for template in templates:
+        for theme in THEMES:
+            for template in TEMPLATES:
                 test_data = {
-                    'project': f'test_{theme}_{template}',
-                    'voice': 'en-US-AriaNeural',
+                    'project': f"test_{theme}_{template}",
+                    'markdown': f"# Test {theme} {template}\nContent for {theme} {template}",
                     'theme': theme,
-                    'template': template,
-                    'markdown': f'---\ntitle: Test {theme} {template}\n---\nTest content'
+                    'template': template
                 }
-                
                 response = client.post('/api/generate', data=test_data)
                 assert response.status_code == 200, f"Failed for {theme}/{template}"
+                data = response.get_json()
+                assert 'message' in data
+                assert data['message'] == 'Project generated successfully'
+                assert 'project' in data
+                assert 'urls' in data
                 
-    @patch('src.web_gui.generate_project')
-    def test_api_generate_font_size_variations(self, mock_generate, client):
+    def test_api_generate_font_size_variations(self, client):
         """Test different font size inputs."""
-        mock_generate.return_value = True
-        
-        font_sizes = ['24', '36', '48', '64', '72', '96']
-        
-        for font_size in font_sizes:
+        for font_size in FONT_SIZES:
             test_data = {
-                'project': f'test_font_{font_size}',
-                'voice': 'en-US-AriaNeural',
-                'theme': 'tech',
-                'template': 'classic',
-                'font_size': font_size,
-                'markdown': f'---\ntitle: Font Size {font_size}\n---\nTest content'
+                'project': f"test_font_{font_size}",
+                'markdown': f"# Test Font Size {font_size}\nContent for font size {font_size}",
+                'font_size': str(font_size)
             }
-            
             response = client.post('/api/generate', data=test_data)
             assert response.status_code == 200, f"Failed for font size: {font_size}"
+            data = response.get_json()
+            assert 'message' in data
+            assert data['message'] == 'Project generated successfully'
+            assert 'project' in data
+            assert 'urls' in data
             
-    @patch('src.web_gui.generate_project')
-    def test_api_generate_language_variations(self, mock_generate, client):
+    def test_api_generate_language_variations(self, client):
         """Test different language inputs."""
-        mock_generate.return_value = True
-        
-        languages = ['pl', 'en', 'de', 'fr', 'es', 'it']
-        
-        for lang in languages:
+        for lang in LANGUAGES:
             test_data = {
-                'project': f'test_lang_{lang}',
-                'voice': 'en-US-AriaNeural',
-                'theme': 'tech',
-                'template': 'classic',
-                'lang': lang,
-                'markdown': f'---\ntitle: Language {lang}\n---\nTest content'
+                'project': f"test_lang_{lang}",
+                'markdown': f"# Test Language {lang}\nContent for language {lang}",
+                'lang': lang
             }
-            
             response = client.post('/api/generate', data=test_data)
             assert response.status_code == 200, f"Failed for language: {lang}"
+            data = response.get_json()
+            assert 'message' in data
+            assert data['message'] == 'Project generated successfully'
+            assert 'project' in data
+            assert 'urls' in data
             
     def test_output_index_endpoint(self, client):
         """Test output index endpoint."""
@@ -335,21 +323,29 @@ class TestWebGUIAPI:
         response = client.get('/files/projects/../../web_gui.py')
         assert response.status_code in [400, 404]
         
-    @patch('src.web_gui.publish_to_wordpress')
-    def test_wordpress_publish_api(self, mock_publish, client):
+    def test_wordpress_publish_api(self, client):
         """Test WordPress publishing API."""
-        mock_publish.return_value = {'status': 'success'}
-        
         test_data = {
-            'project': 'test_wp_project',
-            'wp_url': 'https://test.wordpress.com',
-            'wp_user': 'testuser',
-            'wp_pass': 'testpass'
+            'project': 'wordpress-test',
+            'markdown': '# Test WordPress Publish\nThis is a test content for WordPress.'
         }
+        # First generate the project
+        response = client.post('/api/generate', data=test_data)
+        assert response.status_code == 200
         
-        response = client.post('/api/publish_wp', json=test_data)
-        # Should handle the request (may return error if not implemented)
-        assert response.status_code in [200, 404, 500]
+        # Then attempt to publish (since we can't mock, we'll just check if the endpoint responds)
+        response = client.post('/api/publish/wordpress', data={'project': 'wordpress-test'})
+        assert response.status_code in [200, 400, 500]  # Allow for various responses since actual publishing might fail without credentials
+        data = response.get_json()
+        assert 'message' in data or 'error' in data or 'status' in data
+        
+    def test_api_generate_missing_project_name(self, client):
+        """Test API generation without project name."""
+        response = client.post('/api/generate', data={
+            'markdown': 'test content',
+            'voice': 'en-US-AriaNeural'
+        })
+        assert response.status_code == 400
 
 class TestAPIIntegration:
     """Integration tests for API with real backend."""
