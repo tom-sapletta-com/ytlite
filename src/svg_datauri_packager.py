@@ -11,6 +11,7 @@ Creates self-contained SVG files with:
 import base64
 import json
 import mimetypes
+import os
 from pathlib import Path
 from typing import Dict, Any, Optional
 import xml.etree.ElementTree as ET

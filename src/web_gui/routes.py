@@ -172,7 +172,7 @@ def setup_routes(app: Flask, base_dir: Path, output_dir: Path):
                     project_name=project,
                     content=data.get('markdown', ''),
                     metadata=metadata,
-                    output_path=str(svg_file)
+                    output_path=svg_file
                 )
                 
                 if result:
@@ -385,24 +385,12 @@ def setup_routes(app: Flask, base_dir: Path, output_dir: Path):
             svg_projects_dir = output_dir / 'svg_projects'
             svg_projects_dir.mkdir(parents=True, exist_ok=True)
             for svg_file in svg_projects_dir.glob('*.svg'):
-                try:
-                    from svg_packager import parse_svg_meta
-                    # parse_svg_meta now expects a Path and reads safely in chunks
-                    metadata = parse_svg_meta(svg_file)
-                    projects.append({
-                        'name': svg_file.stem,
-                        'svg': svg_file.name,
-                        'type': 'svg',
-                        'metadata': metadata
-                    })
-                except Exception as e:
-                    logger.warning(f"Failed to read SVG metadata for {svg_file}: {e}")
-                    projects.append({
-                        'name': svg_file.stem,
-                        'svg': svg_file.name,
-                        'type': 'svg',
-                        'metadata': {}
-                    })
+                projects.append({
+                    'name': svg_file.stem,
+                    'svg': svg_file.name,
+                    'type': 'svg',
+                    'metadata': None  # Metadata will be fetched on demand by the client
+                })
             
             return jsonify({'projects': projects})
         except Exception as e:
@@ -411,12 +399,8 @@ def setup_routes(app: Flask, base_dir: Path, output_dir: Path):
 
     @app.route('/api/svg_meta', methods=['GET'])
     def api_svg_meta():
-        """Get metadata for a single SVG project.
-
-        Tests expect:
-        - 400 when 'project' param is missing
-        - 404 when project does not exist
-        - 200 with metadata JSON when found
+        """Get metadata for a single SVG project (simple validator).
+        Returns 400 if project missing, 404 if not found, else metadata JSON.
         """
         project = request.args.get('project', '').strip()
         if not project:
@@ -447,7 +431,6 @@ def setup_routes(app: Flask, base_dir: Path, output_dir: Path):
                 return jsonify({'error': 'SVG project not found'}), 404
             
             from svg_packager import parse_svg_meta
-            # parse_svg_meta now expects a Path
             metadata = parse_svg_meta(svg_file)
             
             return jsonify({
@@ -455,86 +438,9 @@ def setup_routes(app: Flask, base_dir: Path, output_dir: Path):
                 'metadata': metadata or {},
                 'svg_file': f"svg_projects/{project}.svg"
             })
-            
         except Exception as e:
             logger.error(f"Failed to get SVG metadata for {project}: {e}")
             return jsonify({'error': 'Failed to read SVG metadata'}), 500
-
-    @app.route('/api/validate_project')
-    def api_validate_project():
-        """Validate a project's SVG and media files."""
-        project = request.args.get('project', '').strip()
-        if not project:
-            return jsonify({'error': 'Missing project parameter'}), 400
-        try:
-            from validator import validate_project_files
-            from svg_validator import SVGValidator
-            
-            errors = []
-            warnings = []
-            
-            # Check if project exists
-            project_dir = output_dir / 'projects' / project
-            svg_file = output_dir / 'svg_projects' / f"{project}.svg"
-            
-            if svg_file.exists():
-                # Validate SVG project
-                try:
-                    validator = SVGValidator(str(svg_file))
-                    is_valid, validation_errors = validator.validate()
-                    
-                    if not is_valid:
-                        errors.extend(validation_errors)
-                    
-                    from svg_packager import parse_svg_meta
-                    metadata = parse_svg_meta(str(svg_file))
-                    
-                    if not metadata:
-                        warnings.append("No metadata found in SVG")
-                    
-                    # Validate data URIs
-                    svg_content = svg_file.read_text()
-                    if 'data:video' in svg_content:
-                        # Basic validation for video data URIs
-                        video_count = svg_content.count('data:video')
-                        if video_count > 0:
-                            logger.info(f"Found {video_count} video data URI(s) in {project}")
-                    
-                    if 'data:audio' in svg_content:
-                        audio_count = svg_content.count('data:audio')
-                        if audio_count > 0:
-                            logger.info(f"Found {audio_count} audio data URI(s) in {project}")
-                    
-                except Exception as e:
-                    errors.append(f"SVG validation failed: {str(e)}")
-                    
-            elif project_dir.exists():
-                # Validate directory project
-                try:
-                    validation_result = validate_project_files(str(project_dir))
-                    
-                    if not validation_result.get('valid', False):
-                        errors.extend(validation_result.get('errors', []))
-                    
-                    warnings.extend(validation_result.get('warnings', []))
-                    
-                except Exception as e:
-                    errors.append(f"Project validation failed: {str(e)}")
-            else:
-                errors.append("Project not found")
-            
-            is_valid = len(errors) == 0
-            
-            return jsonify({
-                'valid': is_valid,
-                'errors': errors,
-                'warnings': warnings,
-                'project': project
-            })
-            
-        except Exception as e:
-            logger.error(f"Failed to validate project {project}: {e}")
-            return jsonify({'error': f'Validation failed: {str(e)}'}), 500
 
     @app.route('/api/delete_project', methods=['POST'])
     def api_delete_project():

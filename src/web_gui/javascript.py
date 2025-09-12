@@ -10,10 +10,16 @@ def get_javascript_content():
     # For now, return a placeholder to fix the import error
     return """
 // Load existing projects on page load
-document.addEventListener('DOMContentLoaded', function() {
-  loadTheme();
-  loadProjects();
-});
+(function() {
+  (function() {
+  (function() {
+  (function() {
+  (function() {
+  (function() {
+  document.addEventListener('DOMContentLoaded', function() {
+    loadTheme();
+    loadProjects();
+  });
 
 // Project view toggle functionality
 let currentProjectView = 'grid';
@@ -115,6 +121,13 @@ async function loadProjects() {
     if (data.projects && data.projects.length > 0) {
       container.innerHTML = '<div class="projects-grid">' + 
         data.projects.map(project => renderProjectCard(project)).join('') + '</div>';
+      
+      // After rendering the basic cards, fetch metadata for each SVG project
+      data.projects.forEach(project => {
+        if (project.type === 'svg') {
+          loadProjectMetadata(project.name);
+        }
+      });
     } else {
       container.innerHTML = '<p>No projects found. Create your first project!</p>';
     }
@@ -145,27 +158,14 @@ function renderProjectCard(project) {
   let statusBadge, projectPath, openAction, typeIcon, videoPreview;
   
   if (project.type === 'svg') {
-    statusBadge = project.svg_valid ? 
-      '<span class="status-badge status-success">✓ SVG Project</span>' : 
-      '<span class="status-badge status-warning">⚠ Invalid SVG</span>';
+    statusBadge = '<span class="status-badge">📄 SVG Project</span>'; // Placeholder
     projectPath = `/files/svg_projects/${project.svg}`;
     openAction = `<a href="${projectPath}" target="_blank" class="btn btn-primary" onclick="openSVGWithAutoplay('${projectPath}', event)">🎬 Open SVG</a>`;
     typeIcon = '📄';
     
-    // Add video preview if available
-    videoPreview = project.has_video ? 
-      `<div><video class="video-preview" src="/files/projects/${project.name}/video.mp4" muted preload="metadata"></video></div>` : '';
-    
-    // Show metadata if available
-    const metaInfo = project.title && project.title !== project.name ? 
-      `<div style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">📝 ${project.title}</div>` : '';
-    const dateInfo = project.created ? 
-      `<div style="font-size: 11px; color: var(--text-muted);">📅 ${new Date(project.created).toLocaleDateString()}</div>` : '';
-    
-    return `<div class="project-card" onclick="selectProject('${project.name}')">
+    return `<div class="project-card" id="project-card-${project.name}" onclick="selectProject('${project.name}')">
       <div class="project-title">${typeIcon} ${project.name}</div>
-      <div class="project-meta">${statusBadge}${metaInfo}${dateInfo}</div>
-      ${videoPreview || ''}
+      <div class="project-meta" id="project-meta-${project.name}">${statusBadge}</div>
       <div class="project-actions">
         ${openAction}
         <button onclick="editSVGProject('${project.name}', event)" class="btn">✏️ Edit</button>
@@ -201,11 +201,8 @@ function renderProjectCard(project) {
 }
 
 function renderProjectTableRow(project) {
-  const statusText = project.type === 'svg' ? 
-    (project.svg_valid ? '✓ SVG Project' : '⚠ Invalid SVG') :
-    (project.svg ? '✓ Valid SVG' : '⚠ No SVG');
-  
-  const createdDate = project.created ? new Date(project.created).toLocaleDateString() : 'N/A';
+  const statusText = project.type === 'svg' ? '📄 SVG Project' : '📁 Directory';
+  const createdDate = '...'; // Placeholder
   const projectType = project.type === 'svg' ? '📄 SVG' : '📁 Directory';
   
   const actions = `
@@ -220,13 +217,46 @@ function renderProjectTableRow(project) {
     </div>
   `;
   
-  return `<tr onclick="selectProject('${project.name}')" style="cursor: pointer;">
+  return `<tr id="project-row-${project.name}" onclick="selectProject('${project.name}')" style="cursor: pointer;">
     <td><strong>${project.name}</strong></td>
     <td>${projectType}</td>
-    <td>${statusText}</td>
-    <td>${createdDate}</td>
+    <td id="project-status-${project.name}">${statusText}</td>
+    <td id="project-date-${project.name}">${createdDate}</td>
     <td onclick="event.stopPropagation()">${actions}</td>
   </tr>`;
+}
+
+async function loadProjectMetadata(projectName) {
+  try {
+    const res = await fetch(`/api/svg_meta?project=${projectName}`);
+    if (!res.ok) return;
+
+    const meta = await res.json();
+    if (!meta) return;
+
+    // Update Grid View
+    const metaContainer = document.getElementById(`project-meta-${projectName}`);
+    if (metaContainer) {
+        const metaInfo = meta.title && meta.title !== projectName ? 
+            `<div style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">📝 ${meta.title}</div>` : '';
+        const dateInfo = meta.created ? 
+            `<div style="font-size: 11px; color: var(--text-muted);">📅 ${new Date(meta.created).toLocaleDateString()}</div>` : '';
+        metaContainer.innerHTML = '<span class="status-badge status-success">✓ SVG Project</span>' + metaInfo + dateInfo;
+    }
+
+    // Update Table View
+    const statusCell = document.getElementById(`project-status-${projectName}`);
+    const dateCell = document.getElementById(`project-date-${projectName}`);
+    if (statusCell) {
+        statusCell.innerHTML = '✓ SVG Project';
+    }
+    if (dateCell) {
+        dateCell.innerHTML = meta.created ? new Date(meta.created).toLocaleDateString() : 'N/A';
+    }
+
+  } catch (e) {
+    console.error(`Failed to load metadata for ${projectName}:`, e);
+  }
 }
 
 // Project editing functions
@@ -236,8 +266,8 @@ async function editProject(name, evt) {
     // Use single-project metadata endpoint for consistent behavior
     const res = await fetch(`/api/svg_metadata?project=${name}`);
     if (res.ok) {
-      const meta = await res.json();
-      const metaData = meta.metadata || meta; // handle both formats
+      const data = await res.json();
+      const metaData = data.metadata || data; // handle both formats
       populateEditForm(name, metaData);
       showEditForm();
     }
@@ -792,10 +822,25 @@ function showMessage(text, type = 'info') {
   }, 3000);
 }
 
-function showCreateForm() {
-  document.getElementById('createForm').style.display = 'block';
-  document.getElementById('createForm').scrollIntoView({behavior: 'smooth'});
-}
+  // Attach functions to window object to make them accessible from HTML
+  window.toggleTheme = toggleTheme;
+  window.switchProjectView = switchProjectView;
+  window.showCreateForm = showCreateForm;
+  window.hideCreateForm = hideCreateForm;
+  window.generateProject = generateProject;
+  window.editSVGProject = editSVGProject;
+  window.editProject = editProject;
+  window.updateProject = updateProject;
+  window.deleteProject = deleteProject;
+  window.validateProject = validateProject;
+  window.publishToYoutube = publishToYoutube;
+  window.publishToWordPress = publishToWordPress;
+  window.showVersionHistory = showVersionHistory;
+  window.restoreVersion = restoreVersion;
+  window.openSVGWithAutoplay = openSVGWithAutoplay;
+  window.selectProject = selectProject;
+
+})();
 """
 
 JAVASCRIPT_CODE = get_javascript_content()
