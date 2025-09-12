@@ -15,6 +15,7 @@ from typing import Optional
 from datetime import datetime, timezone
 import shutil
 import logging
+from svg_datauri_packager import SVGDataURIPackager
 
 # Set up logging
 logger = logging.getLogger(__name__)
@@ -302,9 +303,8 @@ def update_svg_media(svg_path: str | Path, video_path: Optional[str] = None,
         _backup_current_version(p.parent, p)
     
     txt = p.read_text(encoding="utf-8")
-    # Naive replacement of the JSON block; parse and update
-    import re
-    m = re.search(r"<script type=\"application/json\">(.*?)</script>", txt, flags=re.S)
+    # Naive replacement    # If the first method fails, try the <text id="project-metadata"> format
+    m = re.search(r'<text id="project-metadata">(.*?)</text>', txt, flags=re.DOTALL)
     if not m:
         return False, False, ['No JSON metadata block found in SVG']
     
@@ -355,11 +355,23 @@ def parse_svg_meta(svg_path: str | Path) -> Optional[dict]:
         return None
     import re
     txt = p.read_text(encoding="utf-8")
+
+    # First, try to find the <script type="application/json"> format
     m = re.search(r"<script type=\"application/json\">(.*?)</script>", txt, flags=re.S)
-    if not m:
-        return None
-    js = m.group(1).replace("&lt;", "<")
-    try:
-        return json.loads(js)
-    except Exception:
-        return None
+    if m:
+        js = m.group(1).replace("&lt;", "<")
+        try:
+            return json.loads(js)
+        except Exception:
+            pass  # Fall through to the next method
+
+    # If the first method fails, try the <text id="project-metadata"> format
+    m = re.search(r'<text id="project-metadata">(.*?)</text>', txt, flags=re.DOTALL)
+    if m:
+        js = m.group(1)
+        try:
+            return json.loads(js)
+        except Exception:
+            return None
+
+    return None

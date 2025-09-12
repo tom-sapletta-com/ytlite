@@ -340,10 +340,6 @@ def setup_routes(app: Flask, base_dir: Path, output_dir: Path):
         if not project:
             return jsonify({'message': 'Missing project parameter'}), 400
         from progress import load_progress
-        from svg_packager import parse_svg_meta, update_svg_media
-        from svg_datauri_packager import SVGDataURIPackager, create_svg_project
-        from wordpress_publisher import WordPressPublisher
-        from storage_nextcloud import NextcloudClient
         prog = load_progress(project, output_dir)
         return jsonify(prog or {})
 
@@ -368,8 +364,8 @@ def setup_routes(app: Flask, base_dir: Path, output_dir: Path):
             svg_projects_dir.mkdir(parents=True, exist_ok=True)
             for svg_file in svg_projects_dir.glob('*.svg'):
                 try:
-                    packager = SVGDataURIPackager()
-                    metadata = packager.extract_metadata(svg_file)
+                    from svg_packager import parse_svg_meta
+                    metadata = parse_svg_meta(svg_file)
                     projects.append({
                         'name': svg_file.stem,
                         'svg': svg_file.name,
@@ -390,37 +386,23 @@ def setup_routes(app: Flask, base_dir: Path, output_dir: Path):
             logger.error(f"Error listing projects: {e}", exc_info=True)
             return jsonify({'message': str(e)}), 500
 
-    @app.route('/api/svg_meta')
+    @app.route('/api/svg_meta', methods=['GET'])
     def api_svg_meta():
-        """Get metadata from legacy SVG meta endpoint."""
-        project = request.args.get('project', '').strip()
-        if not project:
-            return jsonify({'error': 'Missing project parameter'}), 400
-        
-        try:
-            # Try to find project in legacy directory first
-            project_dir = output_dir / 'projects' / project
-            if project_dir.exists():
-                # Look for SVG files in the project directory
-                svg_files = list(project_dir.glob('*.svg'))
-                if svg_files:
-                    svg_content = svg_files[0].read_text()
-                    from svg_packager import parse_svg_meta
-                    meta = parse_svg_meta(svg_content)
-                    return jsonify(meta or {})
-            
-            # If not found, try SVG projects directory
-            svg_file = output_dir / 'svg_projects' / f"{project}.svg"
-            if svg_file.exists():
-                packager = SVGDataURIPackager()
-                metadata = packager.extract_metadata(svg_file)
-                return jsonify(metadata or {})
-            
-            return jsonify({'error': 'Project not found'}), 404
-            
-        except Exception as e:
-            logger.error(f"Failed to get SVG meta for {project}: {e}")
-            return jsonify({'error': 'Failed to read SVG metadata'}), 500
+        """API endpoint to get metadata for all SVG files in the output directory."""
+        from svg_packager import parse_svg_meta
+        all_metadata = []
+        svg_projects_dir = output_dir / 'svg_projects'
+        if not svg_projects_dir.exists():
+            return jsonify([])
+
+        for svg_file in svg_projects_dir.glob('*.svg'):
+            try:
+                meta = parse_svg_meta(svg_file)
+                if meta:
+                    all_metadata.append(meta)
+            except Exception as e:
+                logger.warning(f"Failed to read SVG metadata for {svg_file.name}: {e}")
+        return jsonify(all_metadata)
 
     @app.route('/api/svg_metadata')
     def api_svg_metadata():
@@ -434,8 +416,8 @@ def setup_routes(app: Flask, base_dir: Path, output_dir: Path):
             if not svg_file.exists():
                 return jsonify({'error': 'SVG project not found'}), 404
             
-            packager = SVGDataURIPackager()
-            metadata = packager.extract_metadata(svg_file)
+            from svg_packager import parse_svg_meta
+            metadata = parse_svg_meta(svg_file)
             
             return jsonify({
                 'project': project,
@@ -473,9 +455,8 @@ def setup_routes(app: Flask, base_dir: Path, output_dir: Path):
                     if not is_valid:
                         errors.extend(validation_errors)
                     
-                    from svg_datauri_packager import SVGDataURIPackager
-                    packager = SVGDataURIPackager()
-                    metadata = packager.extract_metadata(svg_file)
+                    from svg_packager import parse_svg_meta
+                    metadata = parse_svg_meta(svg_file)
                     
                     if not metadata:
                         warnings.append("No metadata found in SVG")

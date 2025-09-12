@@ -84,74 +84,58 @@ def run_server():
     """Run the production server."""
     console.print("[bold green]🚀 YTLite Web GUI - Production Version[/bold green]")
     
-    try:
-        # Skip dependency verification in test mode
-        if not os.getenv('YTLITE_FAST_TEST'):
-            try:
-                from dependencies import verify_dependencies
-                from logging_setup import get_logger
-                
-                console.print("[yellow]🔍 Verifying dependencies...[/yellow]")
-                verify_dependencies()
-                console.print("[green]✅ Dependencies verified[/green]")
-                
-                logger = get_logger("web_gui")
-                logger.info("YTLite Web GUI starting up")
-                
-            except Exception as e:
-                console.print(f"[orange1]⚠️  Dependency check failed (continuing): {e}[/orange1]")
-        else:
-            console.print("[cyan]⚡ Fast test mode: skipping dependency verification[/cyan]")
-        
-        # Create the Flask app
-        console.print("[yellow]Creating Flask app...[/yellow]")
-        app = create_production_app()
-        console.print("[green]✅ Flask application created successfully[/green]")
-
-    except Exception as e:
-        console.print(f"[red]❌ Failed during app creation: {e}[/red]")
-        import traceback
-        console.print(traceback.format_exc())
-        return 1
+    # Skip dependency verification in test mode
+    if not os.getenv('YTLITE_FAST_TEST'):
+        try:
+            from dependencies import verify_dependencies
+            from logging_setup import get_logger
+            
+            console.print("[yellow]🔍 Verifying dependencies...[/yellow]")
+            verify_dependencies()
+            console.print("[green]✅ Dependencies verified[/green]")
+            
+            logger = get_logger("web_gui")
+            logger.info("YTLite Web GUI starting up")
+            
+        except Exception as e:
+            console.print(f"[orange1]⚠️  Dependency check failed (continuing): {e}[/orange1]")
+    else:
+        console.print("[cyan]⚡ Fast test mode: skipping dependency verification[/cyan]")
     
-    try:
-        # Run validation tests
-        console.print("[yellow]🔍 Running validation tests...[/yellow]")
-        with app.test_client() as client:
-            # Test main page
-            resp = client.get('/')
-            if resp.status_code == 200:
-                console.print("[green]  ✅ Index page: OK[/green]")
-            else:
-                console.print(f"[red]  ❌ Index page: {resp.status_code}[/red]")
-            
-            # Test API endpoints
-            resp = client.get('/api/projects')
-            if resp.status_code == 200:
-                console.print("[green]  ✅ Projects API: OK[/green]")
-            else:
-                console.print(f"[red]  ❌ Projects API: {resp.status_code}[/red]")
-            
-            resp = client.get('/api/svg_meta?project=test')
-            if resp.status_code in [200, 404]:  # 404 is OK for non-existent project
-                console.print("[green]  ✅ SVG Meta API: OK[/green]")
-            else:
-                console.print(f"[red]  ❌ SVG Meta API: {resp.status_code}[/red]")
-            
-            # Test JavaScript serving
-            resp = client.get('/static/js/web_gui.js')
-            if resp.status_code == 200:
-                console.print("[green]  ✅ JavaScript serving: OK[/green]")
-            else:
-                console.print(f"[red]  ❌ JavaScript serving: {resp.status_code}[/red]")
-                
-        console.print("[green]✅ All validation tests completed[/green]")
+    # Create the Flask app
+    app = create_production_app()
+    
+    # Run validation tests
+    console.print("[yellow]🔍 Running validation tests...[/yellow]")
+    with app.test_client() as client:
+        # Test main page
+        resp = client.get('/')
+        if resp.status_code == 200:
+            console.print("[green]  ✅ Index page: OK[/green]")
+        else:
+            console.print(f"[red]  ❌ Index page: {resp.status_code}[/red]")
         
-    except Exception as e:
-        console.print(f"[red]❌ Validation failed: {e}[/red]")
-        import traceback
-        console.print(traceback.format_exc())
-        return 1
+        # Test API endpoints
+        resp = client.get('/api/projects')
+        if resp.status_code == 200:
+            console.print("[green]  ✅ Projects API: OK[/green]")
+        else:
+            console.print(f"[red]  ❌ Projects API: {resp.status_code}[/red]")
+        
+        resp = client.get('/api/svg_meta?project=test')
+        if resp.status_code in [200, 404]:  # 404 is OK for non-existent project
+            console.print("[green]  ✅ SVG Meta API: OK[/green]")
+        else:
+            console.print(f"[red]  ❌ SVG Meta API: {resp.status_code}[/red]")
+        
+        # Test JavaScript serving
+        resp = client.get('/static/js/web_gui.js')
+        if resp.status_code == 200:
+            console.print("[green]  ✅ JavaScript serving: OK[/green]")
+        else:
+            console.print(f"[red]  ❌ JavaScript serving: {resp.status_code}[/red]")
+            
+    console.print("[green]✅ All validation tests completed[/green]")
     
     # Get port configuration
     port = int(os.environ.get('PORT', 5000))
