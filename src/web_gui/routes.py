@@ -18,11 +18,6 @@ import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 from logging_setup import get_logger
-from progress import load_progress
-from svg_packager import parse_svg_meta, update_svg_media
-from svg_datauri_packager import SVGDataURIPackager, create_svg_project
-from wordpress_publisher import WordPressPublisher
-from storage_nextcloud import NextcloudClient
 
 logger = get_logger("web_gui.routes")
 
@@ -146,11 +141,7 @@ def setup_routes(app: Flask, base_dir: Path, output_dir: Path):
                 load_dotenv(str(proj_env))
                 logger.info(f"Loaded per-project .env from {proj_env}")
 
-            # Lazy import YTLite to avoid startup conflicts
-            from ytlite_main import YTLite
-            logger.debug("Initializing YTLite")
-            ytlite = YTLite(output_dir=str(output_dir), project_name=project)
-            logger.debug("YTLite initialized successfully")
+            from svg_datauri_packager import create_svg_project
             
             # Prepare metadata for SVG project creation
             metadata = {
@@ -237,6 +228,7 @@ def setup_routes(app: Flask, base_dir: Path, output_dir: Path):
                 if proj_env.exists():
                     load_dotenv(str(proj_env))
 
+            from wordpress_publisher import WordPressPublisher
             pub = WordPressPublisher()
             result = pub.publish_project(str(proj_dir), publish_status=data.get('status', 'draft'))
             if not result:
@@ -296,7 +288,7 @@ def setup_routes(app: Flask, base_dir: Path, output_dir: Path):
             
             # Try to use existing WordPress publisher
             try:
-                from publishers.wordpress_publisher import WordPressPublisher
+                from wordpress_publisher import WordPressPublisher
                 publisher = WordPressPublisher()
                 result = publisher.publish_project(project)
                 return jsonify({
@@ -331,6 +323,7 @@ def setup_routes(app: Flask, base_dir: Path, output_dir: Path):
                 proj_env = output_dir / 'projects' / project / '.env'
                 if proj_env.exists():
                     load_dotenv(str(proj_env))
+            from storage_nextcloud import NextcloudClient
             client = NextcloudClient()
             local_path = client.fetch_file(remote_path)
             if not local_path:
@@ -346,6 +339,7 @@ def setup_routes(app: Flask, base_dir: Path, output_dir: Path):
         project = request.args.get('project', '').strip()
         if not project:
             return jsonify({'message': 'Missing project parameter'}), 400
+        from progress import load_progress
         prog = load_progress(project, output_dir)
         return jsonify(prog or {})
 
@@ -407,6 +401,7 @@ def setup_routes(app: Flask, base_dir: Path, output_dir: Path):
                 svg_files = list(project_dir.glob('*.svg'))
                 if svg_files:
                     svg_content = svg_files[0].read_text()
+                    from svg_packager import parse_svg_meta
                     meta = parse_svg_meta(svg_content)
                     return jsonify(meta or {})
             
@@ -474,7 +469,7 @@ def setup_routes(app: Flask, base_dir: Path, output_dir: Path):
                     if not is_valid:
                         errors.extend(validation_errors)
                     
-                    # Check for embedded media
+                    from svg_datauri_packager import SVGDataURIPackager
                     packager = SVGDataURIPackager()
                     metadata = packager.extract_metadata(svg_file)
                     
