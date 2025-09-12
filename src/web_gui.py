@@ -910,52 +910,35 @@ def favicon():
     return '', 204
 
 @app.route('/files/<path:filepath>')
-def serve_file(filepath):
-    """Serve files from output directory with proper MIME types for video"""
+def serve_files(filepath):
+    """Serve files from output directory with proper MIME types and security."""
     try:
-        # Normalize path to prevent directory traversal
-        norm_path = os.path.normpath(filepath)
-        if '..' in norm_path or norm_path.startswith('/'):
-            return jsonify({'error': 'Invalid path'}), 404
+        # Security: prevent directory traversal
+        if '..' in filepath or filepath.startswith('/'):
+            return 'Access denied', 403
             
-        full_path = os.path.join(OUTPUT_DIR, norm_path)
-        # Ensure path is within OUTPUT_DIR
-        if not os.path.realpath(full_path).startswith(os.path.realpath(OUTPUT_DIR)):
-            return jsonify({'error': 'Access denied'}), 404
-        from flask import Response
-        import mimetypes
+        file_path = OUTPUT_DIR / filepath
         
-        file_path = full_path
-        if not file_path.exists():
-            return f"File not found: {filepath}", 404
-        
-        # Set proper MIME type for video files
-        mimetype, _ = mimetypes.guess_type(str(file_path))
+        # Check if file exists and is within output directory
+        if not file_path.exists() or not str(file_path.resolve()).startswith(str(OUTPUT_DIR.resolve())):
+            return 'File not found', 404
+            
+        # Set proper MIME type
+        mime_type = None
         if filepath.endswith('.mp4'):
-            mimetype = 'video/mp4'
-        elif filepath.endswith('.webm'):
-            mimetype = 'video/webm'
+            mime_type = 'video/mp4'
         elif filepath.endswith('.mp3'):
-            mimetype = 'audio/mpeg'
-        
-        # For video files, add proper headers to support range requests
-        if filepath.endswith(('.mp4', '.webm', '.avi', '.mov')):
-            def generate():
-                with open(file_path, 'rb') as f:
-                    data = f.read(1024 * 1024)  # Read in 1MB chunks
-                    while data:
-                        yield data
-                        data = f.read(1024 * 1024)
+            mime_type = 'audio/mpeg'
+        elif filepath.endswith('.wav'):
+            mime_type = 'audio/wav'
+        elif filepath.endswith('.jpg') or filepath.endswith('.jpeg'):
+            mime_type = 'image/jpeg'
+        elif filepath.endswith('.png'):
+            mime_type = 'image/png'
+        elif filepath.endswith('.svg'):
+            mime_type = 'image/svg+xml'
             
-            return Response(generate(), 
-                          mimetype=mimetype,
-                          headers={
-                              'Accept-Ranges': 'bytes',
-                              'Content-Length': str(file_path.stat().st_size),
-                              'Cache-Control': 'public, max-age=3600'
-                          })
-        
-        return send_from_directory(OUTPUT_DIR, filepath, mimetype=mimetype)
+        return send_from_directory(OUTPUT_DIR, filepath, mimetype=mime_type)
     except Exception as e:
         logger.error(f"Error serving file {filepath}: {e}")
         return f"File not found: {filepath}", 404
@@ -1394,22 +1377,20 @@ def api_delete_project():
         confirm = data.get('confirm', False)
         
         if not project:
-            return jsonify({'error': 'Missing project name'}), 400
-            
+            return jsonify({'message': 'Missing project name'}), 400
         if '..' in project or '/' in project or '\\' in project:
-            return jsonify({'error': 'Invalid project name'}), 400
-            
+            return jsonify({'message': 'Invalid project path'}), 400
         if not confirm:
-            return jsonify({'error': 'Confirmation required'}), 400
+            return jsonify({'message': 'Confirmation required'}), 400
         
         project_dir = OUTPUT_DIR / 'projects' / project
         
         if not project_dir.exists():
-            return jsonify({'error': 'Project not found'}), 404
+            return jsonify({'message': 'Project not found'}), 404
         
         # Security check: ensure we're only deleting within projects directory
         if not str(project_dir.resolve()).startswith(str((OUTPUT_DIR / 'projects').resolve())):
-            return jsonify({'error': 'Invalid project path'}), 400
+            return jsonify({'message': 'Invalid project path'}), 400
         
         # Delete the entire project directory
         import shutil
