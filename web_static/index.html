@@ -73,7 +73,10 @@
 </head>
 <body>
     <div class="container">
-        <h1>🎬 YTLite Web GUI</h1>
+        <div class="header">
+            <h1>🎬 YTLite Web GUI</h1>
+            <button id="view-toggle" onclick="toggleViewMode()">Switch to Table View</button>
+        </div>
         <div class="status">
             <strong>Status:</strong> ✅ Web GUI is working - <code>make stop</code> command added
         </div>
@@ -81,6 +84,8 @@
         <div id="port-notice" style="background: #fff3cd; color: #856404; padding: 15px; margin-bottom: 20px; border: 1px solid #ffeeba; border-radius: 5px; text-align: center;">
             <p><strong>Notice:</strong> The YTLite Web GUI is now running on a new port. If you are seeing this message, please update your URL to <a href="http://localhost:5001">http://localhost:5001</a>.</p>
         </div>
+        
+        <div id="message" style="display: none; padding: 15px; margin-bottom: 20px; border-radius: 5px; text-align: center;"></div>
         
         <div class="controls">
             <button onclick="toggleView()">Toggle Table/Grid View</button>
