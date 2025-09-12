@@ -21,6 +21,11 @@ from logging_setup import get_logger
 
 logger = get_logger("web_gui.routes")
 
+# Injection points for tests (monkeypatching)
+# Tests expect to be able to monkeypatch these symbols on this module
+WordPressPublisher = None  # monkeypatch can set to a fake publisher class
+NextcloudClient = None     # monkeypatch can set to a fake nextcloud client class
+
 def setup_routes(app: Flask, base_dir: Path, output_dir: Path):
     """Setup all Flask routes for the web GUI."""
     
@@ -228,8 +233,17 @@ def setup_routes(app: Flask, base_dir: Path, output_dir: Path):
                 if proj_env.exists():
                     load_dotenv(str(proj_env))
 
-            from wordpress_publisher import WordPressPublisher
-            pub = WordPressPublisher()
+            # Prefer monkeypatched publisher if provided
+            publisher_cls = WordPressPublisher
+            if publisher_cls is None:
+                try:
+                    from wordpress_publisher import WordPressPublisher as _WPP
+                    publisher_cls = _WPP
+                except Exception as _imp_err:
+                    logger.error(f"Failed to import WordPressPublisher: {_imp_err}")
+                    return jsonify({'message': 'Publish failed'}), 500
+
+            pub = publisher_cls()
             result = pub.publish_project(str(proj_dir), publish_status=data.get('status', 'draft'))
             if not result:
                 logger.error("Publish failed", extra={"project": project})
@@ -288,8 +302,12 @@ def setup_routes(app: Flask, base_dir: Path, output_dir: Path):
             
             # Try to use existing WordPress publisher
             try:
-                from wordpress_publisher import WordPressPublisher
-                publisher = WordPressPublisher()
+                # Prefer monkeypatched publisher if provided
+                publisher_cls = WordPressPublisher
+                if publisher_cls is None:
+                    from wordpress_publisher import WordPressPublisher as _WPP
+                    publisher_cls = _WPP
+                publisher = publisher_cls()
                 result = publisher.publish_project(project)
                 return jsonify({
                     'message': f'Published "{project}" to WordPress successfully',
@@ -323,8 +341,12 @@ def setup_routes(app: Flask, base_dir: Path, output_dir: Path):
                 proj_env = output_dir / 'projects' / project / '.env'
                 if proj_env.exists():
                     load_dotenv(str(proj_env))
-            from storage_nextcloud import NextcloudClient
-            client = NextcloudClient()
+            # Prefer monkeypatched Nextcloud client if provided
+            client_cls = NextcloudClient
+            if client_cls is None:
+                from storage_nextcloud import NextcloudClient as _NC
+                client_cls = _NC
+            client = client_cls()
             local_path = client.fetch_file(remote_path)
             if not local_path:
                 return jsonify({'message': 'Failed to fetch file'}), 500
@@ -389,32 +411,28 @@ def setup_routes(app: Flask, base_dir: Path, output_dir: Path):
 
     @app.route('/api/svg_meta', methods=['GET'])
     def api_svg_meta():
-        """API endpoint to get metadata for all SVG files in the output directory, streamed to save memory."""
-        from svg_packager import parse_svg_meta
-        import json
-        from flask import Response
+        """Get metadata for a single SVG project.
 
-        def generate_metadata():
-            svg_projects_dir = output_dir / 'svg_projects'
-            if not svg_projects_dir.exists():
-                yield '[]'
-                return
+        Tests expect:
+        - 400 when 'project' param is missing
+        - 404 when project does not exist
+        - 200 with metadata JSON when found
+        """
+        project = request.args.get('project', '').strip()
+        if not project:
+            return jsonify({'error': 'Missing project parameter'}), 400
 
-            yield '['
-            first = True
-            for svg_file in svg_projects_dir.glob('*.svg'):
-                try:
-                    meta = parse_svg_meta(svg_file)
-                    if meta:
-                        if not first:
-                            yield ','
-                        yield json.dumps(meta)
-                        first = False
-                except Exception as e:
-                    logger.warning(f"Failed to process SVG metadata for {svg_file.name}: {e}")
-            yield ']'
+        svg_file = output_dir / 'svg_projects' / f"{project}.svg"
+        if not svg_file.exists():
+            return jsonify({'error': 'Project not found'}), 404
 
-        return Response(generate_metadata(), mimetype='application/json')
+        try:
+            from svg_packager import parse_svg_meta
+            meta = parse_svg_meta(svg_file)
+            return jsonify(meta or {}), 200
+        except Exception as e:
+            logger.error(f"Failed to read SVG metadata for {project}: {e}")
+            return jsonify({'error': 'Failed to read SVG metadata'}), 500
 
     @app.route('/api/svg_metadata')
     def api_svg_metadata():

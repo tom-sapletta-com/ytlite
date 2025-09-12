@@ -396,9 +396,10 @@ def parse_svg_meta(svg_path: Path) -> Optional[dict]:
                         else:
                             break # End tag not found
                     # Keep the end of the buffer in case a tag is split across chunks
-                    buffer = buffer[-len(start_tag):]
+                    if len(buffer) > len(start_tag):
+                        buffer = buffer[-len(start_tag):]
         except Exception as e:
             logger.warning(f"Could not parse {svg_path} with a pattern: {e}")
-            continue  # Try next pattern
+            continue # Try next pattern
 
     return None
