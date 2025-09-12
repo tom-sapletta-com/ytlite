@@ -349,26 +349,58 @@ def update_svg_media(svg_path: str | Path, video_path: Optional[str] = None,
 
 
 def parse_svg_meta(svg_content: str) -> Optional[dict]:
-    """Parse metadata from SVG file content."""
+    """Parse metadata from SVG file content.
+
+    Supports multiple embedding formats in order:
+    1) <script type="application/json">{...}</script>
+    2) <text id="project-metadata">{...}</text>
+    3) <desc>...</desc> (returned under key 'description')
+    """
     import re
     import json
 
-    # First, try to find the <script type="application/json"> format
-    m = re.search(r'<script type="application/json">(.*?)</script>', svg_content, flags=re.S)
+    # 1) JSON in <script type="application/json">
+    m = re.search(r'<script[^>]*type=["\']application/json["\'][^>]*>(.*?)</script>', svg_content, flags=re.S | re.I)
     if m:
-        js = m.group(1).replace("&lt;", "<")
+        js = m.group(1).replace('&lt;', '<').replace('&gt;', '>').replace('&amp;', '&')
         try:
-            return json.loads(js)
+            meta = json.loads(js)
+            # If content-like fields missing, enrich from <desc>
+            if not any(k in meta for k in ("markdown_content", "markdown", "content", "description")):
+                m_desc = re.search(r'<desc[^>]*>(.*?)</desc>', svg_content, flags=re.S | re.I)
+                if m_desc:
+                    desc_text = m_desc.group(1).strip()
+                    if desc_text:
+                        meta["description"] = desc_text
+            return meta
         except Exception:
-            pass  # Fall through to the next method
+            pass
 
-    # If the first method fails, try the <text id="project-metadata"> format
-    m = re.search(r'<text id="project-metadata">(.*?)</text>', svg_content, flags=re.DOTALL)
+    # 2) JSON in <text id="project-metadata">
+    m = re.search(r'<text[^>]*id=["\']project-metadata["\'][^>]*>(.*?)</text>', svg_content, flags=re.S | re.I)
     if m:
         js = m.group(1)
         try:
-            return json.loads(js)
+            meta = json.loads(js)
         except Exception:
-            return None
+            try:
+                meta = json.loads(js.replace('&lt;', '<').replace('&gt;', '>').replace('&amp;', '&'))
+            except Exception:
+                meta = None
+        if meta is not None:
+            if not any(k in meta for k in ("markdown_content", "markdown", "content", "description")):
+                m_desc = re.search(r'<desc[^>]*>(.*?)</desc>', svg_content, flags=re.S | re.I)
+                if m_desc:
+                    desc_text = m_desc.group(1).strip()
+                    if desc_text:
+                        meta["description"] = desc_text
+            return meta
+
+    # 3) Fallback to <desc>
+    m = re.search(r'<desc[^>]*>(.*?)</desc>', svg_content, flags=re.S | re.I)
+    if m:
+        desc_text = m.group(1).strip()
+        if desc_text:
+            return {"description": desc_text}
 
     return None

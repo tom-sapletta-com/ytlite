@@ -141,7 +141,7 @@ def setup_routes(app: Flask, base_dir: Path, output_dir: Path):
                 load_dotenv(str(proj_env))
                 logger.info(f"Loaded per-project .env from {proj_env}")
 
-            from svg_datauri_packager import create_svg_project
+            from .helpers import create_svg_project
             
             # Prepare metadata for SVG project creation
             metadata = {
@@ -365,7 +365,8 @@ def setup_routes(app: Flask, base_dir: Path, output_dir: Path):
             for svg_file in svg_projects_dir.glob('*.svg'):
                 try:
                     from svg_packager import parse_svg_meta
-                    metadata = parse_svg_meta(str(svg_file))
+                    svg_content = svg_file.read_text(encoding='utf-8')
+                    metadata = parse_svg_meta(svg_content)
                     projects.append({
                         'name': svg_file.stem,
                         'svg': svg_file.name,
@@ -419,7 +420,8 @@ def setup_routes(app: Flask, base_dir: Path, output_dir: Path):
                 return jsonify({'error': 'SVG project not found'}), 404
             
             from svg_packager import parse_svg_meta
-            metadata = parse_svg_meta(str(svg_file))
+            svg_content = svg_file.read_text(encoding='utf-8')
+            metadata = parse_svg_meta(svg_content)
             
             return jsonify({
                 'project': project,
