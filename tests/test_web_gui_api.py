@@ -321,7 +321,7 @@ class TestWebGUIAPI:
         assert response.status_code in [400, 404]
         
         response = client.get('/files/projects/../../web_gui.py')
-        assert response.status_code in [400, 404]
+        assert response.status_code in [400, 403, 404]
         
     def test_wordpress_publish_api(self, client):
         """Test WordPress publishing API."""
@@ -334,7 +334,7 @@ class TestWebGUIAPI:
         assert response.status_code == 200
         
         # Then attempt to publish (since we can't mock, we'll just check if the endpoint responds)
-        response = client.post('/api/publish/wordpress', data={'project': 'wordpress-test'})
+        response = client.post('/api/publish_wordpress', data={'project': 'wordpress-test'})
         assert response.status_code in [200, 400, 500]  # Allow for various responses since actual publishing might fail without credentials
         data = response.get_json()
         assert 'message' in data or 'error' in data or 'status' in data

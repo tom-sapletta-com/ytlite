@@ -91,9 +91,9 @@ class TestSystemValidation:
     def test_file_operations_security(self):
         """Test file operations for security vulnerabilities."""
         with app.test_client() as client:
-            # Test path traversal protection
+            # Test path traversal prevention
             response = client.get('/files/../../../etc/passwd')
-            assert response.status_code == 404, "Should block path traversal"
+            assert response.status_code in [400, 403, 404], "Should block path traversal"
             
             # Test project deletion security
             response = client.post('/api/delete_project', 
