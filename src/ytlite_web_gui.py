@@ -16,6 +16,8 @@ from rich.console import Console
 
 console = Console()
 
+# Removed problematic import * to avoid conflicts
+
 # Import routes from web_gui module at module level
 from web_gui.routes import *
 
