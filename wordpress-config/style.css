@@ -1,0 +1,40 @@
+/*
+Theme Name: YTLite Theme
+Description: Custom theme for YTLite SVG projects
+Version: 1.0.0
+*/
+
+body {
+    font-family: Arial, sans-serif;
+    margin: 0;
+    padding: 20px;
+    background: #f5f5f5;
+}
+
+.ytlite-svg-container {
+    width: 100%;
+    max-width: 1200px;
+    margin: 20px auto;
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    overflow: hidden;
+}
+
+.ytlite-svg-container svg {
+    width: 100%;
+    height: auto;
+    display: block;
+}
+
+.entry-content {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+.entry-title {
+    text-align: center;
+    color: #333;
+    margin-bottom: 30px;
+}
