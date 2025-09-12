@@ -549,24 +549,53 @@ async function loadProjects() {
     if (data.projects && data.projects.length > 0) {
       container.innerHTML = '<div class="projects-grid">' + 
         data.projects.map(project => {
-          const statusBadge = project.svg ? 
-            '<span class="status-badge status-success">✓ Valid SVG</span>' : 
-            '<span class="status-badge status-warning">⚠ No SVG</span>';
+          // Different handling for SVG vs directory projects
+          let statusBadge, projectPath, openAction, typeIcon;
           
-          const versionInfo = project.versions && project.versions > 1 ? 
-            `<div style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">📝 ${project.versions} versions</div>` : '';
-          
-          return '<div class="project-card" onclick="selectProject(\\\'' + project.name + '\\\')">' +
-            '<div class="project-title">' + project.name + '</div>' +
-            '<div class="project-meta">' + statusBadge + versionInfo + '</div>' +
-            '<div class="project-actions">' + 
-              (project.svg ? '<a href="/files/projects/' + project.name + '/' + project.svg + '" target="_blank" class="btn btn-primary">📄 Open SVG</a>' : '') +
-              '<a href="/files/projects/' + project.name + '/" target="_blank" class="btn">📂 Files</a>' +
-              '<button onclick="editProject(\\\'' + project.name + '\\\')" class="btn">✏️ Edit</button>' +
-              (project.versions && project.versions > 1 ? '<button onclick="showVersionHistory(\\\'' + project.name + '\\\')" class="btn">📜 History</button>' : '') +
-              '<button onclick="deleteProject(\\\'' + project.name + '\\\', event)" class="btn btn-danger" style="margin-left: 8px;">🗑️ Delete</button>' +
-            '</div>' +
-          '</div>';
+          if (project.type === 'svg') {
+            statusBadge = project.svg_valid ? 
+              '<span class="status-badge status-success">✓ SVG Project</span>' : 
+              '<span class="status-badge status-warning">⚠ Invalid SVG</span>';
+            projectPath = `/files/svg_projects/${project.svg}`;
+            openAction = `<a href="${projectPath}" target="_blank" class="btn btn-primary">🎬 Open SVG</a>`;
+            typeIcon = '📄';
+            
+            // Show metadata if available
+            const metaInfo = project.title && project.title !== project.name ? 
+              `<div style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">📝 ${project.title}</div>` : '';
+            const dateInfo = project.created ? 
+              `<div style="font-size: 11px; color: var(--text-muted);">📅 ${new Date(project.created).toLocaleDateString()}</div>` : '';
+            
+            return `<div class="project-card" onclick="selectProject('${project.name}')">
+              <div class="project-title">${typeIcon} ${project.name}</div>
+              <div class="project-meta">${statusBadge}${metaInfo}${dateInfo}</div>
+              <div class="project-actions">
+                ${openAction}
+                <button onclick="editSVGProject('${project.name}')" class="btn">✏️ Edit</button>
+                <button onclick="deleteProject('${project.name}', event)" class="btn btn-danger" style="margin-left: 8px;">🗑️ Delete</button>
+              </div>
+            </div>`;
+          } else {
+            // Legacy directory projects
+            statusBadge = project.svg ? 
+              '<span class="status-badge status-success">✓ Valid SVG</span>' : 
+              '<span class="status-badge status-warning">⚠ No SVG</span>';
+            
+            const versionInfo = project.versions && project.versions > 1 ? 
+              `<div style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">📝 ${project.versions} versions</div>` : '';
+            
+            return `<div class="project-card" onclick="selectProject('${project.name}')">
+              <div class="project-title">📁 ${project.name}</div>
+              <div class="project-meta">${statusBadge}${versionInfo}</div>
+              <div class="project-actions">
+                ${project.svg ? `<a href="/files/projects/${project.name}/${project.svg}" target="_blank" class="btn btn-primary">📄 Open SVG</a>` : ''}
+                <a href="/files/projects/${project.name}/" target="_blank" class="btn">📂 Files</a>
+                <button onclick="editProject('${project.name}')" class="btn">✏️ Edit</button>
+                ${project.versions && project.versions > 1 ? `<button onclick="showVersionHistory('${project.name}')" class="btn">📜 History</button>` : ''}
+                <button onclick="deleteProject('${project.name}', event)" class="btn btn-danger" style="margin-left: 8px;">🗑️ Delete</button>
+              </div>
+            </div>`;
+          }
         }).join('') + '</div>';
     } else {
       container.innerHTML = '<p>No projects found. Create your first project!</p>';
@@ -593,7 +622,7 @@ async function editProject(name) {
     if (res.ok) {
       const meta = await res.json();
       document.getElementById('project').value = name;
-      document.getElementById('markdown').value = (meta.paragraphs || []).join('\\n\\n');
+      document.getElementById('markdown').value = meta.markdown || '';
       if (meta.voice) document.getElementById('voice').value = meta.voice;
       if (meta.theme) document.getElementById('theme').value = meta.theme;
       if (meta.template) document.getElementById('template').value = meta.template;
@@ -603,6 +632,29 @@ async function editProject(name) {
     }
   } catch (e) {
     console.error('Failed to load project metadata:', e);
+  }
+}
+
+async function editSVGProject(name) {
+  try {
+    const res = await fetch(`/api/svg_metadata?project=${name}`);
+    if (res.ok) {
+      const data = await res.json();
+      const meta = data.metadata || {};
+      
+      document.getElementById('project').value = name;
+      document.getElementById('markdown').value = meta.markdown_content || '';
+      if (meta.voice) document.getElementById('voice').value = meta.voice;
+      if (meta.theme) document.getElementById('theme').value = meta.theme;
+      if (meta.template) document.getElementById('template').value = meta.template;
+      if (meta.font_size) document.getElementById('font_size').value = meta.font_size;
+      if (meta.language) document.getElementById('lang').value = meta.language;
+      
+      showCreateForm();
+    }
+  } catch (e) {
+    console.error('Failed to load SVG project metadata:', e);
+    alert('Failed to load project metadata');
   }
 }
 
@@ -1160,6 +1212,32 @@ def api_projects():
                 })
     
     return jsonify({'projects': items})
+
+@app.route('/api/svg_metadata')
+def api_svg_metadata():
+    """Get metadata from SVG project file."""
+    project = request.args.get('project', '').strip()
+    if not project:
+        return jsonify({'error': 'Missing project name'}), 400
+    
+    try:
+        svg_projects_dir = OUTPUT_DIR / 'svg_projects'
+        svg_file = svg_projects_dir / f"{project}.svg"
+        
+        if not svg_file.exists():
+            return jsonify({'error': 'SVG project not found'}), 404
+        
+        packager = SVGDataURIPackager()
+        metadata = packager.extract_metadata(svg_file)
+        
+        return jsonify({
+            'project': project,
+            'metadata': metadata,
+            'file_path': str(svg_file)
+        })
+    except Exception as e:
+        logger.error(f"Failed to get SVG metadata for {project}: {e}")
+        return jsonify({'error': 'Failed to read SVG metadata'}), 500
 
 @app.route('/api/validate_svg')
 def api_validate_svg():
