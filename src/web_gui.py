@@ -914,15 +914,15 @@ def favicon():
 def serve_files(filepath):
     """Serve files from output directory with proper MIME types and security."""
     try:
-        # Security: prevent directory traversal
-        if '..' in filepath or filepath.startswith('/'):
-            return 'Access denied', 403
+        # Normalize path to prevent directory traversal
+        norm_path = os.path.normpath(filepath)
+        if '..' in norm_path or norm_path.startswith('/'):
+            return jsonify({'error': 'Invalid path'}), 404
             
-        file_path = OUTPUT_DIR / filepath
-        
-        # Check if file exists and is within output directory
-        if not file_path.exists() or not str(file_path.resolve()).startswith(str(OUTPUT_DIR.resolve())):
-            return 'File not found', 404
+        full_path = os.path.join(OUTPUT_DIR, norm_path)
+        # Ensure path is within OUTPUT_DIR
+        if not os.path.realpath(full_path).startswith(os.path.realpath(OUTPUT_DIR)):
+            return jsonify({'error': 'Access denied'}), 404
             
         # Set proper MIME type
         mime_type = None
@@ -939,7 +939,7 @@ def serve_files(filepath):
         elif filepath.endswith('.svg'):
             mime_type = 'image/svg+xml'
             
-        return send_from_directory(OUTPUT_DIR, filepath, mimetype=mime_type)
+        return send_from_directory(OUTPUT_DIR, norm_path, mimetype=mime_type)
     except Exception as e:
         logger.error(f"Error serving file {filepath}: {e}")
         return 'Server error', 500
