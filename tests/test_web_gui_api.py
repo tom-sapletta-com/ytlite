@@ -202,22 +202,18 @@ class TestWebGUIAPI:
         data = response.get_json()
         assert 'Missing project or version' in data['message']
         
-    @patch('src.web_gui.generate_project')
-    def test_api_generate_basic_project(self, mock_generate, client):
+    def test_api_generate_basic_project(self, client):
         """Test basic project generation via API."""
-        # Mock successful generation
-        mock_generate.return_value = True
-        
         test_data = TEST_COMBINATIONS[0]
         
         response = client.post('/api/generate', data=test_data)
         assert response.status_code == 200
         
         data = response.get_json()
-        assert 'message' in data or 'status' in data
-        
-        # Verify generate_project was called with correct parameters
-        mock_generate.assert_called_once()
+        assert 'message' in data
+        assert data['message'] == 'Project generated successfully'
+        assert 'project' in data
+        assert 'urls' in data
         
     @patch('src.web_gui.generate_project')
     def test_api_generate_all_voice_options(self, mock_generate, client):
