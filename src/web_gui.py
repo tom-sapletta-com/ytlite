@@ -794,7 +794,7 @@ async function deleteProject(projectName, event) {
   }
   
   const confirmMessage = `⚠️ WARNING: This will permanently delete the project "${projectName}" and ALL its files, including:
-  
+
 • SVG files
 • Version history  
 • Generated content
