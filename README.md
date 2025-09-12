@@ -78,16 +78,37 @@ make upload
 make preview  # http://localhost:8080
 ```
 
+## Features
+
+### 🎬 Content Creation
+- **Markdown to Video**: Transform markdown content into engaging multimedia presentations
+- **Multi-language Support**: Generate content in multiple languages with locale-specific voices
+- **Voice Synthesis**: High-quality text-to-speech using Azure Cognitive Services with 200+ voices
+- **Video Generation**: Automated video creation with customizable themes and templates
+- **Interactive SVG Packaging**: Self-contained SVG files with embedded video/audio content
+
+### 🔧 Advanced Validation & Management
+- **XML Validation**: Comprehensive SVG validation with automatic error fixing
+- **Version Control**: Automatic backup system for all project modifications
+- **Project Management**: Complete lifecycle management via Web GUI
+- **Batch Operations**: Bulk validation and processing of multiple projects
+
+### 🌐 Integrations & Publishing
+- **WordPress Integration**: Direct publishing to WordPress sites with custom fields
+- **Nextcloud Integration**: Content synchronization and remote storage
+- **Web GUI**: Modern, responsive web interface with day/night themes
+- **REST API**: Complete programmatic access to all functionality
+
+### 🛡️ Security & Performance
+- **Path Traversal Protection**: Secure file access with validation
+- **Input Sanitization**: Comprehensive validation of all user inputs
+- **Performance Optimization**: Efficient processing with progress tracking
+- **Error Recovery**: Graceful handling of failures with detailed logging
+
 ## Web GUI (real‑time) — generowanie z podglądem
 
 - Uruchom: `make gui`
 - Otwórz: http://localhost:5000
-- Funkcje:
-  - Generowanie pojedynczego projektu „na żywo” z podglądem wideo i miniatury
-  - Wgrywanie per‑projektowego pliku `.env` (isolated credentials) podczas generacji
-  - Publikacja na WordPress (REST API, post jako draft/domyslnie)
-  - Pobieranie plików markdown z Nextcloud (WebDAV)
-  - Przegląd wygenerowanych plików przez GUI (video, audio, index.md)
 
 Powiązania z podglądem NGINX:
 - Równolegle możesz uruchomić `make preview` (http://localhost:8080) do przeglądania całego `output/`.
