@@ -65,7 +65,7 @@ def main():
             return 1
     
     # Create and configure the app
-    app = create_app()
+    create_app()
     
     # Get port from environment
     port = int(os.getenv('FLASK_PORT', 5000))
@@ -74,7 +74,7 @@ def main():
     console.print(f"[green]🚀 YTLite Web GUI starting on http://localhost:{port}[/green]")
     console.print(f"[blue]📁 Output directory: {OUTPUT_DIR}[/blue]")
     
-    return app, port
+    return port
 
 # Compatibility functions for tests
 def generate_project(*args, **kwargs):
@@ -88,7 +88,9 @@ def publish_to_wordpress(*args, **kwargs):
 if __name__ == '__main__':
     import sys
     
-    app, port = main()
+    port = main()
+    if port == 1:  # Error case
+        sys.exit(1)
     
     # Run the application
     if len(sys.argv) > 1 and sys.argv[1] == 'debug':
