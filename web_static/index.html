@@ -13,6 +13,9 @@
         .grid-view { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
         .project-card { border: 1px solid #ddd; padding: 15px; border-radius: 5px; }
         .project-card img { width: 100%; height: auto; }
+        .table-view { display: table; }
+        .project-card-table { display: table-row; }
+        .project-card-table div { display: table-cell; padding: 10px; border: 1px solid #ddd; }
     </style>
 </head>
 <body>
@@ -20,6 +23,10 @@
         <h1>🎬 YTLite Web GUI</h1>
         <div class="status">
             <strong>Status:</strong> ✅ Web GUI is working - <code>make stop</code> command added
+        </div>
+        
+        <div class="controls">
+            <button onclick="toggleView()">Toggle Table/Grid View</button>
         </div>
         
         <div id="projects-list" class="grid-view">
@@ -41,22 +48,34 @@
     </div>
     
     <script>
+      let isGridView = true;
       function updateProjectsList(projects) {
         const projectsList = document.getElementById('projects-list');
         projectsList.innerHTML = '';
         projects.forEach(project => {
-          const projectCard = `
-            <div class="project-card" data-project="${project.name}">
-              <img src="/api/project/${project.name}/thumbnail" alt="${project.name} Thumbnail" style="width: 100%; height: auto;" onerror="this.src='placeholder.jpg'; this.alt='Thumbnail Not Available';">
-              <h3>${project.name}</h3>
-              <p>Last modified: ${project.lastModified}</p>
-            </div>
-          `;
-          projectsList.innerHTML += projectCard;
+          if (isGridView) {
+            const projectCard = `
+              <div class="project-card" data-project="${project.name}">
+                <img src="/api/project/${project.name}/thumbnail" alt="${project.name} Thumbnail" style="width: 100%; height: auto;" onerror="this.src='placeholder.jpg'; this.alt='Thumbnail Not Available';">
+                <h3>${project.name}</h3>
+                <p>Last modified: ${project.lastModified}</p>
+              </div>
+            `;
+            projectsList.innerHTML += projectCard;
+          } else {
+            const projectCard = `
+              <div class="project-card-table">
+                <div><img src="/api/project/${project.name}/thumbnail" alt="${project.name} Thumbnail" style="width: 100%; height: auto;" onerror="this.src='placeholder.jpg'; this.alt='Thumbnail Not Available';"></div>
+                <div><h3>${project.name}</h3></div>
+                <div><p>Last modified: ${project.lastModified}</p></div>
+              </div>
+            `;
+            projectsList.innerHTML += projectCard;
+          }
         });
 
         // Add click event to show preview
-        document.querySelectorAll('.project-card').forEach(card => {
+        document.querySelectorAll('.project-card, .project-card-table').forEach(card => {
           card.addEventListener('click', function() {
             const projectName = this.getAttribute('data-project');
             showProjectPreview(projectName);
@@ -74,6 +93,16 @@
         projectThumbnail.alt = `${projectName} Thumbnail`;
         projectDetails.innerHTML = `<h3>${projectName}</h3>`;
         // Additional project details can be fetched and displayed here
+      }
+
+      function toggleView() {
+        isGridView = !isGridView;
+        if (isGridView) {
+          document.getElementById('projects-list').className = 'grid-view';
+        } else {
+          document.getElementById('projects-list').className = 'table-view';
+        }
+        // Call updateProjectsList here if you want to update the view immediately
       }
     </script>
 </body>
