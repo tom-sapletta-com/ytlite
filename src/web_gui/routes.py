@@ -21,7 +21,6 @@ from logging_setup import get_logger
 from progress import load_progress
 from svg_packager import parse_svg_meta, update_svg_media
 from svg_datauri_packager import SVGDataURIPackager, create_svg_project
-from ytlite_main import YTLite
 from wordpress_publisher import WordPressPublisher
 from storage_nextcloud import NextcloudClient
 
@@ -58,8 +57,8 @@ def setup_routes(app: Flask, base_dir: Path, output_dir: Path):
     def serve_javascript():
         """Serve the JavaScript content."""
         try:
-            from .javascript import get_javascript_content
-            return get_javascript_content(), 200, {'Content-Type': 'application/javascript'}
+            from . import javascript
+            return javascript.get_javascript_content(), 200, {'Content-Type': 'application/javascript'}
         except ImportError:
             logger.error("Failed to import get_javascript_content from web_gui.javascript")
             return "// Error: JavaScript content not available", 200, {'Content-Type': 'application/javascript'}
@@ -147,9 +146,10 @@ def setup_routes(app: Flask, base_dir: Path, output_dir: Path):
                 load_dotenv(str(proj_env))
                 logger.info(f"Loaded per-project .env from {proj_env}")
 
-            # Initialize YTLite
+            # Lazy import YTLite to avoid startup conflicts
+            from ytlite_main import YTLite
             logger.debug("Initializing YTLite")
-            ytlite = YTLite(str(output_dir), project)
+            ytlite = YTLite(output_dir=str(output_dir), project_name=project)
             logger.debug("YTLite initialized successfully")
             
             # Prepare metadata for SVG project creation
@@ -370,7 +370,6 @@ def setup_routes(app: Flask, base_dir: Path, output_dir: Path):
             svg_projects_dir.mkdir(parents=True, exist_ok=True)
             for svg_file in svg_projects_dir.glob('*.svg'):
                 try:
-                    # Corrected initialization with no arguments
                     packager = SVGDataURIPackager()
                     metadata = packager.extract_metadata(svg_file)
                     projects.append({
@@ -414,8 +413,8 @@ def setup_routes(app: Flask, base_dir: Path, output_dir: Path):
             # If not found, try SVG projects directory
             svg_file = output_dir / 'svg_projects' / f"{project}.svg"
             if svg_file.exists():
-                packager = SVGDataURIPackager(str(svg_file))
-                metadata = packager.get_metadata()
+                packager = SVGDataURIPackager()
+                metadata = packager.extract_metadata(svg_file)
                 return jsonify(metadata or {})
             
             return jsonify({'error': 'Project not found'}), 404
@@ -436,8 +435,8 @@ def setup_routes(app: Flask, base_dir: Path, output_dir: Path):
             if not svg_file.exists():
                 return jsonify({'error': 'SVG project not found'}), 404
             
-            packager = SVGDataURIPackager(str(svg_file))
-            metadata = packager.get_metadata()
+            packager = SVGDataURIPackager()
+            metadata = packager.extract_metadata(svg_file)
             
             return jsonify({
                 'project': project,
@@ -476,8 +475,8 @@ def setup_routes(app: Flask, base_dir: Path, output_dir: Path):
                         errors.extend(validation_errors)
                     
                     # Check for embedded media
-                    packager = SVGDataURIPackager(str(svg_file))
-                    metadata = packager.get_metadata()
+                    packager = SVGDataURIPackager()
+                    metadata = packager.extract_metadata(svg_file)
                     
                     if not metadata:
                         warnings.append("No metadata found in SVG")

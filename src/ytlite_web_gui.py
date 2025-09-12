@@ -84,34 +84,38 @@ def run_server():
     """Run the production server."""
     console.print("[bold green]🚀 YTLite Web GUI - Production Version[/bold green]")
     
-    # Skip dependency verification in test mode
-    if not os.getenv('YTLITE_FAST_TEST'):
-        try:
-            from dependencies import verify_dependencies
-            from logging_setup import get_logger
-            
-            console.print("[yellow]🔍 Verifying dependencies...[/yellow]")
-            verify_dependencies()
-            console.print("[green]✅ Dependencies verified[/green]")
-            
-            logger = get_logger("web_gui")
-            logger.info("YTLite Web GUI starting up")
-            
-        except Exception as e:
-            console.print(f"[orange1]⚠️  Dependency check failed (continuing): {e}[/orange1]")
-    else:
-        console.print("[cyan]⚡ Fast test mode: skipping dependency verification[/cyan]")
-    
-    # Create the Flask app
     try:
+        # Skip dependency verification in test mode
+        if not os.getenv('YTLITE_FAST_TEST'):
+            try:
+                from dependencies import verify_dependencies
+                from logging_setup import get_logger
+                
+                console.print("[yellow]🔍 Verifying dependencies...[/yellow]")
+                verify_dependencies()
+                console.print("[green]✅ Dependencies verified[/green]")
+                
+                logger = get_logger("web_gui")
+                logger.info("YTLite Web GUI starting up")
+                
+            except Exception as e:
+                console.print(f"[orange1]⚠️  Dependency check failed (continuing): {e}[/orange1]")
+        else:
+            console.print("[cyan]⚡ Fast test mode: skipping dependency verification[/cyan]")
+        
+        # Create the Flask app
+        console.print("[yellow]Creating Flask app...[/yellow]")
         app = create_production_app()
         console.print("[green]✅ Flask application created successfully[/green]")
+
     except Exception as e:
-        console.print(f"[red]❌ Failed to create Flask app: {e}[/red]")
+        console.print(f"[red]❌ Failed during app creation: {e}[/red]")
+        import traceback
+        console.print(traceback.format_exc())
         return 1
     
-    # Run validation tests
     try:
+        # Run validation tests
         console.print("[yellow]🔍 Running validation tests...[/yellow]")
         with app.test_client() as client:
             # Test main page
@@ -145,10 +149,12 @@ def run_server():
         
     except Exception as e:
         console.print(f"[red]❌ Validation failed: {e}[/red]")
+        import traceback
+        console.print(traceback.format_exc())
         return 1
     
     # Get port configuration
-    port = int(os.getenv('FLASK_PORT', 5000))
+    port = int(os.environ.get('PORT', 5000))
     
     console.print(f"[bold green]🌐 Starting server on http://localhost:{port}[/bold green]")
     console.print("[dim]📝 All refactored components are active and tested[/dim]")
@@ -163,6 +169,24 @@ def run_server():
             use_reloader=False,
             threaded=True
         )
+    except OSError as e:
+        if 'Address already in use' in str(e):
+            logger = get_logger("web_gui")
+            logger.warning(f"Port {port} is in use. Trying port {port + 1}...")
+            try:
+                app.run(
+                    host='0.0.0.0',
+                    port=port + 1,
+                    debug=False,
+                    use_reloader=False,
+                    threaded=True
+                )
+            except OSError as e2:
+                logger.error(f"Failed to start server on port {port + 1}: {e2}")
+                print(f"Failed to start server on port {port + 1}. Please free up port {port} or {port + 1}.")
+        else:
+            logger.error(f"Failed to start server: {e}")
+            raise
     except KeyboardInterrupt:
         console.print("\n[yellow]👋 Server stopped by user[/yellow]")
         return 0

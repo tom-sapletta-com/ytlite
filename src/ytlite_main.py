@@ -32,14 +32,14 @@ logger = get_logger("ytlite_main")
 class YTLite:
     """Main YTLite orchestrator using modular components"""
     
-    def __init__(self, config_path: str = "config.yaml"):
+    def __init__(self, config_path: str = "config.yaml", output_dir: str = "output", project_name: str = None):
         self.config = self._load_config(config_path)
         self.content_parser = ContentParser()
         self.audio_generator = AudioGenerator(self.config)
         self.video_generator = VideoGenerator(self.config)
         
         # Setup output directories
-        self.output_dir = Path("output")
+        self.output_dir = Path(output_dir)
         self.output_dir.mkdir(exist_ok=True)
         (self.output_dir / "videos").mkdir(exist_ok=True)
         (self.output_dir / "shorts").mkdir(exist_ok=True)

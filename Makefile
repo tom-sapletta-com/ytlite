@@ -135,9 +135,9 @@ publish-pypi: ## Publish project to PyPI
 quick: ## Quick content from stdin (echo "content" | make quick)
 	@bash scripts/quick.sh
 
-gui: ## Run Web GUI (Flask) on http://localhost:5000
+gui: ## Run Web GUI (Flask) on http://localhost:5003
 	@echo "$(GREEN)🚀 Starting YTLite Web GUI (Refactored Version)$(NC)"
-	@cd src && YTLITE_FAST_TEST=1 ../venv/bin/python ytlite_web_gui.py
+	@cd src && YTLITE_FAST_TEST=1 PORT=5003 ../venv/bin/python ytlite_web_gui.py
 
 stop: ## Stop all running servers and processes
 	@echo "$(YELLOW)Stopping all servers and processes...$(NC)"
@@ -148,6 +148,7 @@ stop: ## Stop all running servers and processes
 	-@pkill -f "python3.*-c.*Flask" 2>/dev/null
 	-@lsof -ti:5000 | xargs -r kill -9 2>/dev/null
 	-@lsof -ti:8080 | xargs -r kill -9 2>/dev/null
+	-@lsof -ti:5000 | xargs -r kill -SIGKILL 2>/dev/null
 	@echo "$(GREEN)✅ All servers stopped$(NC)"
 
 logs: ## Show last 200 lines of logs/ytlite.log
