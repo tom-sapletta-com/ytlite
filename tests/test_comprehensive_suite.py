@@ -68,6 +68,8 @@ class TestSystemValidation:
         with app.test_client() as client:
             # Test projects endpoint
             response = client.get('/api/projects')
+            print(f"Debug: /api/projects response status code: {response.status_code}")
+            print(f"Debug: /api/projects response data: {response.get_data(as_text=True)}")
             assert response.status_code == 200
             data = response.get_json()
             assert 'projects' in data
