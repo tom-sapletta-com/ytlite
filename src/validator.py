@@ -14,6 +14,8 @@ from rich.table import Table
 from datetime import datetime
 import logging
 import importlib
+import argparse
+import sys
 
 console = Console()
 logger = logging.getLogger(__name__)
@@ -406,7 +408,8 @@ class Validator:
             "failed": failed,
             "errors": errors
         }
-        self._save_report(results, "app")
+        report_path = self._save_report(results, "app")
+        results["report_path"] = report_path
         return results
 
     def _save_report(self, results, report_type):
@@ -414,6 +417,7 @@ class Validator:
         with open(report_path, 'w') as f:
             json.dump(results, f, indent=2)
         console.print(f"[green]✓ Report saved to {report_path}[/]")
+        return report_path
 
     def validate_data(self, content_path, detailed: bool = False):
         """Validate the data integrity for content files."""
@@ -515,14 +519,36 @@ def validate_all_videos(video_dir: str = "output/videos", content_dir: str = "co
     return report
 
 def main():
-    validator = Validator('/home/tom/github/tom-sapletta-com/ytlite')
-    app_summary, app_report_path = validator.validate_app()
-    print("App Validation Summary:\n", app_summary)
-    print(f"Full report at: {app_report_path}\n")
-
-    data_summary, data_report_path = validator.validate_data('/home/tom/github/tom-sapletta-com/ytlite/content/episodes')
-    print("Data Validation Summary:\n", data_summary)
-    print(f"Full report at: {data_report_path}\n")
-
+    import argparse
+    parser = argparse.ArgumentParser(description='Validate YTLite data and app setup')
+    parser.add_argument('command', choices=['validate_data', 'validate_app', 'validate_videos'], help='Command to execute')
+    parser.add_argument('--detailed', action='store_true', help='Run detailed validation including build tests')
+    args = parser.parse_args()
+    validator = Validator()
+    if args.command == 'validate_data':
+        summary, report_path = validator.validate_data()
+        console.print(f"✓ Report saved to {report_path}")
+        if summary['failed'] > 0 or summary['errors'] > 0:
+            console.print(f"[bold red]Data validation failed. Check logs for details.[/]")
+            sys.exit(1)
+        else:
+            console.print(f"[bold green]Data validation successful![/]")
+    elif args.command == 'validate_app':
+        app_results = validator.validate_app(detailed=args.detailed)
+        report_path = app_results.get('report_path', 'Unknown path')
+        console.print(f"✓ Report saved to {report_path}")
+        if app_results['summary']['failed'] > 0 or app_results['summary']['errors'] > 0:
+            console.print(f"[bold red]App validation failed. Check logs for details.[/]")
+            sys.exit(1)
+        else:
+            console.print(f"[bold green]App validation successful![/]")
+    elif args.command == 'validate_videos':
+        summary, report_path = validator.validate_all_videos(detailed=args.detailed)
+        console.print(f"✓ Report saved to {report_path}")
+        if summary['error'] > 0:
+            console.print(f"[bold red]Video validation failed. Check logs for details.[/]")
+            sys.exit(1)
+        else:
+            console.print(f"[bold green]Video validation successful![/]")
 if __name__ == "__main__":
     main()

@@ -13,10 +13,14 @@ Open: http://localhost:5000
 from __future__ import annotations
 
 import os
+import sys
 from pathlib import Path
 
 from flask import Flask
 from rich.console import Console
+
+# Add current directory to Python path for imports
+sys.path.insert(0, os.path.dirname(__file__))
 
 from dependencies import verify_dependencies
 from logging_setup import get_logger

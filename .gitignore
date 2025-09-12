@@ -3,6 +3,7 @@ venv
 episodes/
 reports/
 *.mp4
+*.m4a
 .env
 # Byte-compiled / optimized / DLL files
 __pycache__/
