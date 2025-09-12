@@ -1062,7 +1062,7 @@ def api_generate():
             urls['svg'] = f"/files/svg_projects/{project}.svg"
             
         logger.info("POST /api/generate ok", extra={"project": project})
-        return jsonify({'project': project, 'urls': urls})
+        return jsonify({'message': 'Project generated successfully', 'project': project, 'urls': urls})
     except Exception as e:
         console.print(f"[red]API generate error: {e}[/]")
         logger.error("POST /api/generate failed", extra={"error": str(e)})
