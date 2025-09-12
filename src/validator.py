@@ -8,7 +8,7 @@ import os
 import json
 import subprocess
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 from rich.console import Console
 from rich.table import Table
 from datetime import datetime
@@ -419,52 +419,62 @@ class Validator:
         console.print(f"[green]✓ Report saved to {report_path}[/]")
         return report_path
 
-    def validate_data(self, content_path, detailed: bool = False):
-        """Validate the data integrity for content files."""
-        results = []
-        try:
-            # Check if content path exists
-            if not os.path.exists(content_path):
-                results.append({'check': 'Content path existence', 'status': 'FAIL', 'message': f"Content path {content_path} does not exist."})
-            else:
-                results.append({'check': 'Content path existence', 'status': 'PASS'})
-
-                # Check for markdown files
-                md_files = [f for f in os.listdir(content_path) if f.endswith('.md')]
-                if not md_files:
-                    results.append({'check': 'Markdown files presence', 'status': 'FAIL', 'message': "No markdown files found in content path."})
-                else:
-                    results.append({'check': 'Markdown files presence', 'status': 'PASS', 'message': f"Found {len(md_files)} markdown files."})
-
-                    # Validate content of each markdown file
-                    for md_file in md_files:
-                        with open(os.path.join(content_path, md_file), 'r', encoding='utf-8') as f:
-                            content = f.read()
-                            if not content.strip():
-                                results.append({'check': f"Content validation for {md_file}", 'status': 'FAIL', 'message': f"{md_file} is empty."})
-                            else:
-                                results.append({'check': f"Content validation for {md_file}", 'status': 'PASS'})
-
-        except Exception as e:
-            results.append({'check': 'Data validation', 'status': 'ERROR', 'message': str(e)})
-
-        report = {
-            'validation_type': 'data',
-            'timestamp': datetime.now().isoformat(),
-            'content_path': content_path,
-            'results': results
+    def validate_data(self, content_path: str = 'content') -> Tuple[dict, str]:
+        """Validate data structure and content"""
+        results = {
+            "timestamp": datetime.now().isoformat(),
+            "validation_type": "Data",
+            "results": []
         }
-        report_path = os.path.join(self.reports_dir, f'data_validation_report_{datetime.now().strftime("%Y%m%d_%H%M%S")}.json')
-        with open(report_path, 'w') as f:
-            json.dump(report, f, indent=2)
-
-        if detailed:
-            logger.info("Detailed data validation report saved", extra={"report_path": report_path, "results": results})
+        passed = 0
+        failed = 0
+        errors = 0
+        content_path_abs = os.path.join(self.project_dir, content_path)
+        if not os.path.exists(content_path_abs):
+            results["results"].append({
+                "test": "Content directory exists",
+                "status": "FAIL",
+                "message": f"Content directory {content_path_abs} does not exist."
+            })
+            failed += 1
         else:
-            logger.info("Data validation report saved", extra={"report_path": report_path})
-
-        summary = self.summarize_report(report)
-        return summary, report_path
+            results["results"].append({
+                "test": "Content directory exists",
+                "status": "PASS",
+                "message": f"Content directory {content_path_abs} found."
+            })
+            passed += 1
+            # Check for expected subdirectories
+            for subdir in ['episodes', 'projects', 'templates']:
+                subdir_path = os.path.join(content_path_abs, subdir)
+                if os.path.exists(subdir_path):
+                    results["results"].append({
+                        "test": f"{subdir} directory exists",
+                        "status": "PASS",
+                        "message": f"{subdir} directory found."
+                    })
+                    passed += 1
+                    # Count items in each directory
+                    item_count = len(os.listdir(subdir_path))
+                    results["results"].append({
+                        "test": f"{subdir} content count",
+                        "status": "INFO",
+                        "message": f"{item_count} items found in {subdir}."
+                    })
+                else:
+                    results["results"].append({
+                        "test": f"{subdir} directory exists",
+                        "status": "FAIL",
+                        "message": f"{subdir} directory not found."
+                    })
+                    failed += 1
+        results["summary"] = {
+            "passed": passed,
+            "failed": failed,
+            "errors": errors
+        }
+        report_path = self._save_report(results, "data")
+        return results["summary"], report_path
 
     def summarize_report(self, report):
         """Summarize the validation report into a concise format."""
@@ -475,7 +485,7 @@ class Validator:
         summary += f"Results: {pass_count} Passed, {fail_count} Failed, {error_count} Errors\n"
         for result in report['results']:
             if result['status'] != 'PASS':
-                summary += f"- {result['check']}: {result['status']}"
+                summary += f"- {result['test']}: {result['status']}"
                 if 'message' in result:
                     summary += f" ({result['message'][:100]}...)"
                 summary += "\n"
