@@ -93,7 +93,15 @@ def _fix_common_xml_issues(svg_content: str) -> str:
 
 
 def validate_and_fix_svg(svg_path: Path) -> tuple[bool, list[str]]:
-    """Validate SVG and attempt to fix common issues if validation fails."""
+    """
+    Validate SVG and attempt to fix common issues if validation fails.
+    
+    Args:
+        svg_path: Path to SVG file to validate and fix
+        
+    Returns:
+        tuple: (is_valid, list_of_errors)
+    """
     is_valid, errors = _validate_svg(svg_path)
     
     if not is_valid:
@@ -103,12 +111,11 @@ def validate_and_fix_svg(svg_path: Path) -> tuple[bool, list[str]]:
         
         if fixed_content != content:
             svg_path.write_text(fixed_content, encoding="utf-8")
+            print(f"✓ Fixed XML issues in: {svg_path}")
+            # Re-validate after fixing
             is_valid, errors = _validate_svg(svg_path)
-            
-            if is_valid:
-                print(f"✓ Successfully fixed XML issues in: {svg_path}")
-            else:
-                print(f"⚠ Issues remain after automatic fix")
+        else:
+            print("⚠ No fixable issues found")
     
     return is_valid, errors
 
