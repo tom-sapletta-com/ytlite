@@ -491,7 +491,9 @@ INDEX_HTML = """
   <div class="box preview" id="preview" style="display:none">
     <h2>Preview</h2>
     <div id="links"></div>
-    <video id="vid" controls></video>
+    <video id="vid" controls preload="metadata" style="max-width: 100%; height: auto;">
+      <p>Your browser does not support HTML video. <a href="#" id="vid-fallback">Download video</a></p>
+    </video>
     <div><img id="thumb" alt="thumbnail" style="max-width:360px;margin-top:8px;"/></div>
   </div>
 
@@ -675,8 +677,35 @@ async function generate() {
         ${validationDetails}
       </div>
     </div>`;
-  if (data.video_url) document.getElementById('vid').src = data.video_url;
-  if (data.thumbnail_url) document.getElementById('thumb').src = data.thumbnail_url;
+  if (data.urls && data.urls.video) {
+    const videoElement = document.getElementById('vid');
+    const fallbackLink = document.getElementById('vid-fallback');
+    
+    // Set video source and fallback download link
+    videoElement.src = data.urls.video;
+    fallbackLink.href = data.urls.video;
+    fallbackLink.textContent = 'Download video file';
+    
+    // Add error handling for video loading
+    videoElement.onerror = function(e) {
+      console.error('Video loading error:', e);
+      console.log('Video source:', videoElement.src);
+    };
+    
+    videoElement.onloadstart = function() {
+      console.log('Video loading started:', data.urls.video);
+    };
+    
+    videoElement.oncanplay = function() {
+      console.log('Video can start playing');
+    };
+    
+    // Force reload of video element
+    videoElement.load();
+  }
+  if (data.urls && data.urls.thumb) {
+    document.getElementById('thumb').src = data.urls.thumb;
+  }
   document.getElementById('preview').style.display = '';
   await loadProjects();
 }
@@ -829,9 +858,42 @@ def favicon():
 
 @app.route('/files/<path:filepath>')
 def serve_file(filepath):
-    """Serve files from output directory"""
+    """Serve files from output directory with proper MIME types for video"""
     try:
-        return send_from_directory(OUTPUT_DIR, filepath)
+        from flask import Response
+        import mimetypes
+        
+        file_path = OUTPUT_DIR / filepath
+        if not file_path.exists():
+            return f"File not found: {filepath}", 404
+        
+        # Set proper MIME type for video files
+        mimetype, _ = mimetypes.guess_type(str(file_path))
+        if filepath.endswith('.mp4'):
+            mimetype = 'video/mp4'
+        elif filepath.endswith('.webm'):
+            mimetype = 'video/webm'
+        elif filepath.endswith('.mp3'):
+            mimetype = 'audio/mpeg'
+        
+        # For video files, add proper headers to support range requests
+        if filepath.endswith(('.mp4', '.webm', '.avi', '.mov')):
+            def generate():
+                with open(file_path, 'rb') as f:
+                    data = f.read(1024 * 1024)  # Read in 1MB chunks
+                    while data:
+                        yield data
+                        data = f.read(1024 * 1024)
+            
+            return Response(generate(), 
+                          mimetype=mimetype,
+                          headers={
+                              'Accept-Ranges': 'bytes',
+                              'Content-Length': str(file_path.stat().st_size),
+                              'Cache-Control': 'public, max-age=3600'
+                          })
+        
+        return send_from_directory(OUTPUT_DIR, filepath, mimetype=mimetype)
     except Exception as e:
         logger.error(f"Error serving file {filepath}: {e}")
         return f"File not found: {filepath}", 404
