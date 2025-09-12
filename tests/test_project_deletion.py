@@ -76,7 +76,7 @@ class TestProjectDeletion:
         
         assert response.status_code == 400
         data = response.get_json()
-        assert 'Missing project name' in data['message']
+        assert 'Missing project name' in data['error']
     
     def test_delete_project_no_confirmation(self, client, temp_project):
         """Test deletion without confirmation."""
@@ -87,7 +87,7 @@ class TestProjectDeletion:
         
         assert response.status_code == 400
         data = response.get_json()
-        assert 'Confirmation required' in data['message']
+        assert 'Confirmation required' in data['error']
         
         # Project should still exist
         assert project_dir.exists()
@@ -99,7 +99,7 @@ class TestProjectDeletion:
         
         assert response.status_code == 404
         data = response.get_json()
-        assert 'Project not found' in data['message']
+        assert 'Project not found' in data['error']
     
     def test_delete_project_security_check(self, client):
         """Test security check prevents path traversal."""
@@ -108,7 +108,7 @@ class TestProjectDeletion:
         
         assert response.status_code == 400
         data = response.get_json()
-        assert 'Invalid project path' in data['message']
+        assert 'Invalid project path' in data['error']
     
     def test_delete_project_with_special_characters(self, client):
         """Test deletion with special characters in project name."""
