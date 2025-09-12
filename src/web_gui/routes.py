@@ -124,8 +124,10 @@ def setup_routes(app: Flask, base_dir: Path, output_dir: Path):
         try:
             logger.info("POST /api/generate start")
             data = request.form.to_dict()
+            logger.debug(f"Request form data: {data}")
             project = data.get('project', '').strip()
             if not project:
+                logger.error("Missing project name in request")
                 return jsonify({'message': 'Missing project name'}), 400
 
             # Get per-project env file if uploaded
@@ -143,7 +145,9 @@ def setup_routes(app: Flask, base_dir: Path, output_dir: Path):
                 logger.info(f"Loaded per-project .env from {proj_env}")
 
             # Initialize YTLite
+            logger.debug("Initializing YTLite")
             ytlite = YTLite(str(output_dir), project)
+            logger.debug("YTLite initialized successfully")
             
             # Prepare metadata for SVG project creation
             metadata = {
@@ -208,6 +212,7 @@ def setup_routes(app: Flask, base_dir: Path, output_dir: Path):
 
         except Exception as e:
             logger.error("POST /api/generate failed", extra={"error": str(e)})
+            logger.debug(f"Full error details: {e}", exc_info=True)
             return jsonify({'message': str(e)}), 500
 
     @app.route('/api/publish_wordpress', methods=['POST'])
