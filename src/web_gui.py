@@ -811,6 +811,7 @@ async function showVersionHistory(projectName) {
     }
   } catch (e) {
     console.error('Failed to load version history:', e);
+  }
 }
 
 async function publishWP() {
