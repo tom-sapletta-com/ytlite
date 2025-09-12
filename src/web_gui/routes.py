@@ -340,6 +340,10 @@ def setup_routes(app: Flask, base_dir: Path, output_dir: Path):
         if not project:
             return jsonify({'message': 'Missing project parameter'}), 400
         from progress import load_progress
+        from svg_packager import parse_svg_meta, update_svg_media
+        from svg_datauri_packager import SVGDataURIPackager, create_svg_project
+        from wordpress_publisher import WordPressPublisher
+        from storage_nextcloud import NextcloudClient
         prog = load_progress(project, output_dir)
         return jsonify(prog or {})
 
