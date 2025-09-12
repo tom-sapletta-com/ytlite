@@ -365,8 +365,8 @@ def setup_routes(app: Flask, base_dir: Path, output_dir: Path):
             for svg_file in svg_projects_dir.glob('*.svg'):
                 try:
                     from svg_packager import parse_svg_meta
-                    svg_content = svg_file.read_text(encoding='utf-8')
-                    metadata = parse_svg_meta(svg_content)
+                    # parse_svg_meta now expects a Path and reads safely in chunks
+                    metadata = parse_svg_meta(svg_file)
                     projects.append({
                         'name': svg_file.stem,
                         'svg': svg_file.name,
@@ -429,8 +429,8 @@ def setup_routes(app: Flask, base_dir: Path, output_dir: Path):
                 return jsonify({'error': 'SVG project not found'}), 404
             
             from svg_packager import parse_svg_meta
-            svg_content = svg_file.read_text(encoding='utf-8')
-            metadata = parse_svg_meta(svg_content)
+            # parse_svg_meta now expects a Path
+            metadata = parse_svg_meta(svg_file)
             
             return jsonify({
                 'project': project,

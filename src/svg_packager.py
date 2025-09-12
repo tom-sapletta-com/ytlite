@@ -399,6 +399,6 @@ def parse_svg_meta(svg_path: Path) -> Optional[dict]:
                     buffer = buffer[-len(start_tag):]
         except Exception as e:
             logger.warning(f"Could not parse {svg_path} with a pattern: {e}")
-            continue # Try next pattern
+            continue  # Try next pattern
 
     return None
