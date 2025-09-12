@@ -260,13 +260,19 @@ class VideoValidator:
             "results": results
         }
         
-        # Ensure all values in results are JSON serializable
-        for item in report["results"]:
-            for key in list(item.keys()):
-                if isinstance(item[key], bool):
-                    item[key] = int(item[key])
-                elif not isinstance(item[key], (str, int, float, list, dict, type(None))):
-                    item[key] = str(item[key])
+        # Ensure all values in results are JSON serializable with a comprehensive recursive function
+        def make_serializable(obj):
+            if isinstance(obj, (bool, int, float, str, type(None))):
+                return obj
+            elif isinstance(obj, (list, tuple)):
+                return [make_serializable(item) for item in obj]
+            elif isinstance(obj, dict):
+                return {str(key): make_serializable(value) for key, value in obj.items()}
+            else:
+                return str(obj)
+
+        # Apply serialization fix to the entire report structure
+        report = make_serializable(report)
         
         # Save JSON report
         Path(output_path).parent.mkdir(parents=True, exist_ok=True)
