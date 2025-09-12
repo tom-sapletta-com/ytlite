@@ -326,64 +326,47 @@ def setup_routes(app: Flask, base_dir: Path, output_dir: Path):
 
     @app.route('/api/projects')
     def api_projects():
-        """List all projects including both directory-based and SVG-based projects."""
-        items = []
-        
-        # Check for directory-based projects
-        projects_dir = output_dir / 'projects'
-        if projects_dir.exists():
-            for item in projects_dir.iterdir():
-                if item.is_dir():
-                    project_data = {'name': item.name, 'type': 'directory'}
-                    
-                    # Look for SVG files in the project directory
-                    svg_files = list(item.glob('*.svg'))
-                    if svg_files:
-                        project_data['svg'] = svg_files[0].name
-                        
-                    # Count versions (look for numbered backup files)
-                    version_files = list(item.glob('*.bak*')) + list(item.glob('*_v[0-9]*'))
-                    if version_files:
-                        project_data['versions'] = len(version_files) + 1
-                    
-                    items.append(project_data)
-        
-        # Check for SVG-based projects
-        svg_projects_dir = output_dir / 'svg_projects'
-        if svg_projects_dir.exists():
+        try:
+            projects = []
+            # List directory-based projects
+            projects_dir = output_dir / 'projects'
+            projects_dir.mkdir(parents=True, exist_ok=True)
+            for project_dir in projects_dir.iterdir():
+                if project_dir.is_dir():
+                    svg_file = next(project_dir.glob('*.svg'), None)
+                    projects.append({
+                        'name': project_dir.name,
+                        'svg': svg_file.name if svg_file else None,
+                        'type': 'directory'
+                    })
+            
+            # List SVG-based projects
+            svg_projects_dir = output_dir / 'svg_projects'
+            svg_projects_dir.mkdir(parents=True, exist_ok=True)
             for svg_file in svg_projects_dir.glob('*.svg'):
                 try:
-                    # Use SVGDataURIPackager to read metadata
-                    packager = SVGDataURIPackager(str(svg_file))
-                    metadata = packager.get_metadata()
-                    
-                    project_data = {
+                    # Corrected initialization with no arguments
+                    packager = SVGDataURIPackager()
+                    metadata = packager.extract_metadata(svg_file)
+                    projects.append({
                         'name': svg_file.stem,
-                        'type': 'svg',
                         'svg': svg_file.name,
-                        'svg_valid': True
-                    }
-                    
-                    # Add metadata if available
-                    if metadata:
-                        if 'title' in metadata:
-                            project_data['title'] = metadata['title']
-                        if 'created' in metadata:
-                            project_data['created'] = metadata['created']
-                    
-                    items.append(project_data)
-                    
+                        'type': 'svg',
+                        'metadata': metadata
+                    })
                 except Exception as e:
                     logger.warning(f"Failed to read SVG metadata for {svg_file}: {e}")
-                    # Still add the project but mark as invalid
-                    items.append({
+                    projects.append({
                         'name': svg_file.stem,
-                        'type': 'svg',
                         'svg': svg_file.name,
-                        'svg_valid': False
+                        'type': 'svg',
+                        'metadata': {}
                     })
-        
-        return jsonify({'projects': items})
+            
+            return jsonify({'projects': projects})
+        except Exception as e:
+            logger.error(f"Error listing projects: {e}", exc_info=True)
+            return jsonify({'message': str(e)}), 500
 
     @app.route('/api/svg_meta')
     def api_svg_meta():

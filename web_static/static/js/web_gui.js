@@ -21,6 +21,22 @@ document.addEventListener('DOMContentLoaded', () => {
     } else {
         setViewMode('grid'); // Default to grid view
     }
+    
+    // Toggle between grid and table view
+    document.getElementById('view-toggle').addEventListener('click', function() {
+        const projectsList = document.getElementById('projectsList');
+        if (projectsList.classList.contains('projects-grid')) {
+            projectsList.classList.remove('projects-grid');
+            projectsList.classList.add('table-view');
+            this.textContent = 'Grid View';
+        } else {
+            projectsList.classList.remove('table-view');
+            projectsList.classList.add('projects-grid');
+            this.textContent = 'Table View';
+        }
+        localStorage.setItem('viewMode', projectsList.classList.contains('projects-grid') ? 'grid' : 'table');
+        loadProjects();
+    });
 });
 
 function toggleTheme() {

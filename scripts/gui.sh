@@ -11,11 +11,21 @@ echo -e "${YELLOW}🌐 Starting YTLite Web GUI at http://localhost:5000${NC}"
 cd "$(dirname "$0")/.." || exit 1
 source venv/bin/activate || exit 1
 
-# Use the correct path to web_gui.py
-python build/lib/src/web_gui.py || {
-    echo "Failed to start using build path, trying source path"
-    python src/web_gui.py || {
+# Use the new path to ytlite_web_gui.py
+python src/ytlite_web_gui.py || {
+    echo "Failed to start using source path, trying build path"
+    python build/lib/src/ytlite_web_gui.py || {
         echo "Failed to start Web GUI. Check if the path is correct and dependencies are installed."
-        exit 1
+        # Try starting on a different port if 5000 is in use
+        echo "Trying to start on port 5001..."
+        FLASK_PORT=5001 python src/ytlite_web_gui.py || {
+            echo "Failed to start on port 5001. Check if the port is in use."
+            # Try starting on port 5002 if 5001 is in use
+            echo "Trying to start on port 5002..."
+            FLASK_PORT=5002 python src/ytlite_web_gui.py || {
+                echo "Failed to start on port 5002. Check if the port is in use."
+                exit 1
+            }
+        }
     }
 }
