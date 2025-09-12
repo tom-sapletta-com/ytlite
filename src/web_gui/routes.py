@@ -390,34 +390,21 @@ def setup_routes(app: Flask, base_dir: Path, output_dir: Path):
     def api_svg_meta():
         """API endpoint to get metadata for all SVG files in the output directory."""
         from svg_packager import parse_svg_meta
-        debug_log = ["--- GET /api/svg_meta ---"]
         all_metadata = []
         svg_projects_dir = output_dir / 'svg_projects'
-        debug_log.append(f"Searching for SVGs in: {svg_projects_dir}")
 
         if not svg_projects_dir.exists():
-            debug_log.append("SVG projects directory not found.")
-            return jsonify({'metadata': [], 'debug_log': debug_log})
+            return jsonify([])
 
-        svg_files = list(svg_projects_dir.glob('*.svg'))
-        debug_log.append(f"Found {len(svg_files)} SVG files to process.")
-
-        for svg_file in svg_files:
+        for svg_file in svg_projects_dir.glob('*.svg'):
             try:
-                debug_log.append(f"Processing file: {svg_file.name}")
                 svg_content = svg_file.read_text(encoding='utf-8')
-                debug_log.append(f"  - Read {len(svg_content)} bytes.")
                 meta = parse_svg_meta(svg_content)
                 if meta:
-                    debug_log.append(f"  - SUCCESS: Parsed metadata for {svg_file.name}. Title: {meta.get('title')}")
                     all_metadata.append(meta)
-                else:
-                    debug_log.append(f"  - FAILED: No metadata found in {svg_file.name}")
             except Exception as e:
-                debug_log.append(f"  - ERROR: Failed to process {svg_file.name}: {e}")
-        
-        debug_log.append(f"--- Returning {len(all_metadata)} metadata objects ---")
-        return jsonify({'metadata': all_metadata, 'debug_log': debug_log})
+                logger.warning(f"Failed to read SVG metadata for {svg_file.name}: {e}")
+        return jsonify(all_metadata)
 
     @app.route('/api/svg_metadata')
     def api_svg_metadata():

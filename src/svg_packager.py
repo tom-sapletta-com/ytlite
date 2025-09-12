@@ -15,7 +15,6 @@ from typing import Optional
 from datetime import datetime, timezone
 import shutil
 import logging
-from svg_datauri_packager import SVGDataURIPackager
 
 # Set up logging
 logger = logging.getLogger(__name__)
