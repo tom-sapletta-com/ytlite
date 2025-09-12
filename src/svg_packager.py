@@ -348,59 +348,57 @@ def update_svg_media(svg_path: str | Path, video_path: Optional[str] = None,
     return True, is_valid, errors
 
 
-def parse_svg_meta(svg_content: str) -> Optional[dict]:
-    """Parse metadata from SVG file content.
-
-    Supports multiple embedding formats in order:
-    1) <script type="application/json">{...}</script>
-    2) <text id="project-metadata">{...}</text>
-    3) <desc>...</desc> (returned under key 'description')
-    """
-    import re
+def parse_svg_meta(svg_path: Path) -> Optional[dict]:
+    """Parse metadata from an SVG file by reading it in chunks to avoid OOM errors."""
     import json
 
-    # 1) JSON in <script type="application/json">
-    m = re.search(r'<script[^>]*type=["\']application/json["\'][^>]*>(.*?)</script>', svg_content, flags=re.S | re.I)
-    if m:
-        js = m.group(1).replace('&lt;', '<').replace('&gt;', '>').replace('&amp;', '&')
-        try:
-            meta = json.loads(js)
-            # If content-like fields missing, enrich from <desc>
-            if not any(k in meta for k in ("markdown_content", "markdown", "content", "description")):
-                m_desc = re.search(r'<desc[^>]*>(.*?)</desc>', svg_content, flags=re.S | re.I)
-                if m_desc:
-                    desc_text = m_desc.group(1).strip()
-                    if desc_text:
-                        meta["description"] = desc_text
-            return meta
-        except Exception:
-            pass
+    search_patterns = [
+        {
+            "start_tag": '<script type="application/json">',
+            "end_tag": '</script>',
+            "post_process": lambda js: js.replace("&lt;", "<").replace('&gt;', '>').replace('&amp;', '&')
+        },
+        {
+            "start_tag": '<text id="project-metadata">',
+            "end_tag": '</text>',
+            "post_process": lambda js: js.replace('&lt;', '<').replace('&gt;', '>').replace('&amp;', '&')
+        }
+    ]
 
-    # 2) JSON in <text id="project-metadata">
-    m = re.search(r'<text[^>]*id=["\']project-metadata["\'][^>]*>(.*?)</text>', svg_content, flags=re.S | re.I)
-    if m:
-        js = m.group(1)
+    for pattern in search_patterns:
         try:
-            meta = json.loads(js)
-        except Exception:
-            try:
-                meta = json.loads(js.replace('&lt;', '<').replace('&gt;', '>').replace('&amp;', '&'))
-            except Exception:
-                meta = None
-        if meta is not None:
-            if not any(k in meta for k in ("markdown_content", "markdown", "content", "description")):
-                m_desc = re.search(r'<desc[^>]*>(.*?)</desc>', svg_content, flags=re.S | re.I)
-                if m_desc:
-                    desc_text = m_desc.group(1).strip()
-                    if desc_text:
-                        meta["description"] = desc_text
-            return meta
-
-    # 3) Fallback to <desc>
-    m = re.search(r'<desc[^>]*>(.*?)</desc>', svg_content, flags=re.S | re.I)
-    if m:
-        desc_text = m.group(1).strip()
-        if desc_text:
-            return {"description": desc_text}
+            with open(svg_path, 'r', encoding='utf-8', errors='ignore') as f:
+                buffer = ""
+                start_tag = pattern["start_tag"]
+                end_tag = pattern["end_tag"]
+                
+                # Find the start tag by reading in chunks
+                while True:
+                    chunk = f.read(8192) # Read in 8KB chunks
+                    if not chunk:
+                        break # End of file
+                    buffer += chunk
+                    start_index = buffer.find(start_tag)
+                    if start_index != -1:
+                        # Found start tag, now find end tag
+                        buffer = buffer[start_index + len(start_tag):]
+                        while end_tag not in buffer:
+                            chunk = f.read(8192)
+                            if not chunk:
+                                break # End of file before end tag
+                            buffer += chunk
+                        
+                        end_index = buffer.find(end_tag)
+                        if end_index != -1:
+                            json_text = buffer[:end_index]
+                            processed_text = pattern["post_process"](json_text)
+                            return json.loads(processed_text)
+                        else:
+                            break # End tag not found
+                    # Keep the end of the buffer in case a tag is split across chunks
+                    buffer = buffer[-len(start_tag):]
+        except Exception as e:
+            logger.warning(f"Could not parse {svg_path} with a pattern: {e}")
+            continue # Try next pattern
 
     return None

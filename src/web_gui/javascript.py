@@ -71,8 +71,14 @@ function loadTheme() {
 
 // Form management
 function showCreateForm() {
-  document.getElementById('createForm').style.display = 'block';
-  document.getElementById('createForm').scrollIntoView({behavior: 'smooth'});
+  // Show create form, hide edit form to avoid confusion
+  const createForm = document.getElementById('createForm');
+  const editForm = document.getElementById('editForm');
+  if (editForm) editForm.style.display = 'none';
+  if (createForm) {
+    createForm.style.display = 'block';
+    createForm.scrollIntoView({behavior: 'smooth'});
+  }
 }
 
 function hideCreateForm() {
@@ -80,8 +86,14 @@ function hideCreateForm() {
 }
 
 function showEditForm() {
-  document.getElementById('editForm').style.display = 'block';
-  document.getElementById('editForm').scrollIntoView({behavior: 'smooth'});
+  // Show edit form, hide create form to avoid confusion
+  const editForm = document.getElementById('editForm');
+  const createForm = document.getElementById('createForm');
+  if (createForm) createForm.style.display = 'none';
+  if (editForm) {
+    editForm.style.display = 'block';
+    editForm.scrollIntoView({behavior: 'smooth'});
+  }
 }
 
 function hideEditForm() {
@@ -156,7 +168,7 @@ function renderProjectCard(project) {
       ${videoPreview || ''}
       <div class="project-actions">
         ${openAction}
-        <button onclick="editSVGProject('${project.name}')" class="btn">✏️ Edit</button>
+        <button onclick="editSVGProject('${project.name}', event)" class="btn">✏️ Edit</button>
         <button onclick="validateProject('${project.name}', event)" class="btn" style="background: #28a745; color: white;">✓ Validate</button>
         <button onclick="publishToYoutube('${project.name}', event)" class="btn" style="background: #ff4444; color: white;">📺 YouTube</button>
         <button onclick="publishToWordPress('${project.name}', event)" class="btn" style="background: #21759b; color: white;">📝 WordPress</button>
@@ -178,7 +190,7 @@ function renderProjectCard(project) {
       <div class="project-actions">
         ${project.svg ? `<a href="/files/projects/${project.name}/${project.svg}" target="_blank" class="btn btn-primary">📄 Open SVG</a>` : ''}
         <a href="/files/projects/${project.name}/" target="_blank" class="btn">📂 Files</a>
-        <button onclick="editProject('${project.name}')" class="btn">✏️ Edit</button>
+        <button onclick="editProject('${project.name}', event)" class="btn">✏️ Edit</button>
         ${project.versions && project.versions > 1 ? `<button onclick="showVersionHistory('${project.name}')" class="btn">📜 History</button>` : ''}
         <button onclick="publishToYoutube('${project.name}', event)" class="btn" style="background: #ff4444; color: white;">📺 YouTube</button>
         <button onclick="publishToWordPress('${project.name}', event)" class="btn" style="background: #21759b; color: white;">📝 WordPress</button>
@@ -218,12 +230,15 @@ function renderProjectTableRow(project) {
 }
 
 // Project editing functions
-async function editProject(name) {
+async function editProject(name, evt) {
+  if (evt) { evt.preventDefault(); evt.stopPropagation(); }
   try {
-    const res = await fetch(`/api/svg_meta?project=${name}`);
+    // Use single-project metadata endpoint for consistent behavior
+    const res = await fetch(`/api/svg_metadata?project=${name}`);
     if (res.ok) {
       const meta = await res.json();
-      populateEditForm(name, meta);
+      const metaData = meta.metadata || meta; // handle both formats
+      populateEditForm(name, metaData);
       showEditForm();
     }
   } catch (e) {
@@ -232,7 +247,8 @@ async function editProject(name) {
   }
 }
 
-async function editSVGProject(name) {
+async function editSVGProject(name, evt) {
+  if (evt) { evt.preventDefault(); evt.stopPropagation(); }
   try {
     const res = await fetch(`/api/svg_metadata?project=${name}`);
     if (res.ok) {

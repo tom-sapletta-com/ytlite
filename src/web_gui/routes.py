@@ -389,23 +389,32 @@ def setup_routes(app: Flask, base_dir: Path, output_dir: Path):
 
     @app.route('/api/svg_meta', methods=['GET'])
     def api_svg_meta():
-        """API endpoint to get metadata for all SVG files in the output directory."""
+        """API endpoint to get metadata for all SVG files in the output directory, streamed to save memory."""
         from svg_packager import parse_svg_meta
-        all_metadata = []
-        svg_projects_dir = output_dir / 'svg_projects'
+        import json
+        from flask import Response
 
-        if not svg_projects_dir.exists():
-            return jsonify([])
+        def generate_metadata():
+            svg_projects_dir = output_dir / 'svg_projects'
+            if not svg_projects_dir.exists():
+                yield '[]'
+                return
 
-        for svg_file in svg_projects_dir.glob('*.svg'):
-            try:
-                svg_content = svg_file.read_text(encoding='utf-8')
-                meta = parse_svg_meta(svg_content)
-                if meta:
-                    all_metadata.append(meta)
-            except Exception as e:
-                logger.warning(f"Failed to read SVG metadata for {svg_file.name}: {e}")
-        return jsonify(all_metadata)
+            yield '['
+            first = True
+            for svg_file in svg_projects_dir.glob('*.svg'):
+                try:
+                    meta = parse_svg_meta(svg_file)
+                    if meta:
+                        if not first:
+                            yield ','
+                        yield json.dumps(meta)
+                        first = False
+                except Exception as e:
+                    logger.warning(f"Failed to process SVG metadata for {svg_file.name}: {e}")
+            yield ']'
+
+        return Response(generate_metadata(), mimetype='application/json')
 
     @app.route('/api/svg_metadata')
     def api_svg_metadata():
