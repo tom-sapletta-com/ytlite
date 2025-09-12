@@ -41,37 +41,362 @@ INDEX_HTML = """
 <html>
 <head>
   <title>YTLite Web GUI</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <style>
-    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; margin: 20px; background: #f5f5f5; }
-    .box { border: 1px solid #ddd; padding: 16px; margin-bottom: 16px; border-radius: 8px; background: white; }
-    label { display:block; margin-top:8px; font-weight:bold; }
-    textarea { width: 100%; height: 180px; }
-    input[type=text] { width: 100%; }
-    .row { display: flex; gap: 16px; }
+    :root {
+      --bg-primary: #ffffff;
+      --bg-secondary: #f8f9fa;
+      --bg-accent: #f5f5f5;
+      --text-primary: #212529;
+      --text-secondary: #6c757d;
+      --text-muted: #adb5bd;
+      --border-color: #dee2e6;
+      --border-hover: #00ff88;
+      --shadow: rgba(0, 0, 0, 0.1);
+      --shadow-hover: rgba(0, 255, 136, 0.2);
+      --btn-primary: #00ff88;
+      --btn-primary-hover: #00cc66;
+      --btn-secondary: #6c757d;
+      --btn-danger: #dc3545;
+      --success: #28a745;
+      --warning: #ffc107;
+      --danger: #dc3545;
+    }
+    
+    [data-theme="dark"] {
+      --bg-primary: #1a1a1a;
+      --bg-secondary: #2d2d2d;
+      --bg-accent: #343a40;
+      --text-primary: #ffffff;
+      --text-secondary: #adb5bd;
+      --text-muted: #6c757d;
+      --border-color: #495057;
+      --shadow: rgba(255, 255, 255, 0.1);
+      --shadow-hover: rgba(0, 255, 136, 0.3);
+    }
+    
+    * { box-sizing: border-box; }
+    
+    body { 
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      margin: 0; 
+      padding: 20px;
+      background: var(--bg-accent);
+      color: var(--text-primary);
+      line-height: 1.6;
+      transition: all 0.3s ease;
+    }
+    
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 30px;
+      padding: 20px 0;
+    }
+    
+    .header h1 {
+      margin: 0;
+      background: linear-gradient(45deg, #00ff88, #007acc);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      font-size: 2.5rem;
+      font-weight: 700;
+    }
+    
+    .theme-toggle {
+      padding: 10px 16px;
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.2s;
+      color: var(--text-primary);
+      font-size: 14px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    
+    .theme-toggle:hover {
+      background: var(--bg-primary);
+      border-color: var(--border-hover);
+    }
+    
+    .box { 
+      border: 1px solid var(--border-color); 
+      padding: 24px; 
+      margin-bottom: 24px; 
+      border-radius: 12px; 
+      background: var(--bg-primary);
+      box-shadow: 0 2px 8px var(--shadow);
+      transition: all 0.2s;
+    }
+    
+    .box:hover {
+      box-shadow: 0 4px 16px var(--shadow);
+    }
+    
+    .box h2 {
+      margin-top: 0;
+      margin-bottom: 20px;
+      color: var(--text-primary);
+      font-size: 1.5rem;
+      font-weight: 600;
+    }
+    
+    label { 
+      display: block; 
+      margin-top: 16px; 
+      margin-bottom: 6px;
+      font-weight: 600; 
+      color: var(--text-primary);
+      font-size: 14px;
+    }
+    
+    textarea, input[type=text], select { 
+      width: 100%; 
+      padding: 12px 16px;
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      background: var(--bg-secondary);
+      color: var(--text-primary);
+      font-size: 14px;
+      transition: all 0.2s;
+      font-family: inherit;
+    }
+    
+    textarea { height: 200px; resize: vertical; }
+    
+    textarea:focus, input[type=text]:focus, select:focus {
+      outline: none;
+      border-color: var(--border-hover);
+      box-shadow: 0 0 0 3px var(--shadow-hover);
+    }
+    
+    .row { display: flex; gap: 20px; margin-top: 16px; }
     .col { flex: 1; }
-    .preview { margin-top: 16px; }
-    video { width: 100%; max-width: 720px; }
-    progress { width: 100%; height: 20px; }
-    .projects-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; margin-top: 20px; }
-    .project-card { border: 1px solid #ddd; border-radius: 8px; padding: 16px; background: white; cursor: pointer; transition: all 0.2s; }
-    .project-card:hover { border-color: #00ff88; box-shadow: 0 2px 8px rgba(0,255,136,0.2); }
-    .project-title { font-size: 18px; font-weight: bold; color: #333; margin-bottom: 8px; }
-    .project-meta { font-size: 14px; color: #666; margin-bottom: 12px; }
-    .project-actions { display: flex; gap: 8px; }
-    .btn { padding: 6px 12px; border: 1px solid #ddd; background: #f8f8f8; border-radius: 4px; cursor: pointer; text-decoration: none; font-size: 12px; }
-    .btn:hover { background: #e8e8e8; }
-    .btn-primary { background: #00ff88; border-color: #00ff88; color: white; }
-    .btn-primary:hover { background: #00cc66; }
-    .create-new { background: #007acc; color: white; padding: 20px; text-align: center; border-radius: 8px; margin-bottom: 20px; }
-    .create-new:hover { background: #0066aa; }
+    
+    .projects-grid { 
+      display: grid; 
+      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); 
+      gap: 20px; 
+      margin-top: 24px; 
+    }
+    
+    .project-card { 
+      border: 1px solid var(--border-color); 
+      border-radius: 12px; 
+      padding: 20px; 
+      background: var(--bg-primary); 
+      cursor: pointer; 
+      transition: all 0.2s;
+      position: relative;
+      overflow: hidden;
+    }
+    
+    .project-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 4px;
+      background: linear-gradient(90deg, var(--btn-primary), #007acc);
+      transform: translateX(-100%);
+      transition: transform 0.3s ease;
+    }
+    
+    .project-card:hover::before {
+      transform: translateX(0);
+    }
+    
+    .project-card:hover { 
+      border-color: var(--border-hover); 
+      box-shadow: 0 8px 24px var(--shadow-hover);
+      transform: translateY(-2px);
+    }
+    
+    .project-title { 
+      font-size: 18px; 
+      font-weight: 600; 
+      color: var(--text-primary); 
+      margin-bottom: 8px; 
+    }
+    
+    .project-meta { 
+      font-size: 14px; 
+      color: var(--text-secondary); 
+      margin-bottom: 16px; 
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    
+    .project-actions { 
+      display: flex; 
+      gap: 8px; 
+      flex-wrap: wrap;
+    }
+    
+    .btn { 
+      padding: 8px 16px; 
+      border: 1px solid var(--border-color); 
+      background: var(--bg-secondary); 
+      border-radius: 6px; 
+      cursor: pointer; 
+      text-decoration: none; 
+      font-size: 13px;
+      font-weight: 500;
+      transition: all 0.2s;
+      color: var(--text-primary);
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    
+    .btn:hover { 
+      background: var(--bg-primary); 
+      border-color: var(--border-hover);
+      transform: translateY(-1px);
+    }
+    
+    .btn-primary { 
+      background: var(--btn-primary); 
+      border-color: var(--btn-primary); 
+      color: white; 
+    }
+    
+    .btn-primary:hover { 
+      background: var(--btn-primary-hover); 
+      border-color: var(--btn-primary-hover);
+    }
+    
+    .btn-danger {
+      background: var(--btn-danger);
+      border-color: var(--btn-danger);
+      color: white;
+    }
+    
+    .btn-danger:hover {
+      background: #c82333;
+      border-color: #c82333;
+    }
+    
+    .create-new { 
+      background: linear-gradient(135deg, var(--btn-primary) 0%, #007acc 100%);
+      color: white; 
+      padding: 30px; 
+      text-align: center; 
+      border-radius: 12px; 
+      margin-bottom: 24px;
+      cursor: pointer;
+      transition: all 0.3s;
+      box-shadow: 0 4px 16px var(--shadow);
+    }
+    
+    .create-new:hover { 
+      transform: translateY(-2px);
+      box-shadow: 0 8px 24px var(--shadow-hover);
+    }
+    
+    .create-new h2 {
+      margin: 0 0 12px 0;
+      font-size: 1.8rem;
+      font-weight: 600;
+    }
+    
+    .create-new p {
+      margin: 0;
+      opacity: 0.9;
+      font-size: 16px;
+    }
+    
+    .progress-container {
+      margin-top: 20px;
+      padding: 16px;
+      background: var(--bg-secondary);
+      border-radius: 8px;
+      border: 1px solid var(--border-color);
+    }
+    
+    progress { 
+      width: 100%; 
+      height: 8px; 
+      border-radius: 4px;
+      -webkit-appearance: none;
+      appearance: none;
+    }
+    
+    progress::-webkit-progress-bar {
+      background-color: var(--bg-accent);
+      border-radius: 4px;
+    }
+    
+    progress::-webkit-progress-value {
+      background: linear-gradient(90deg, var(--btn-primary), #007acc);
+      border-radius: 4px;
+    }
+    
+    .status-badge {
+      display: inline-block;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    
+    .status-success {
+      background: rgba(40, 167, 69, 0.1);
+      color: var(--success);
+      border: 1px solid rgba(40, 167, 69, 0.2);
+    }
+    
+    .status-warning {
+      background: rgba(255, 193, 7, 0.1);  
+      color: var(--warning);
+      border: 1px solid rgba(255, 193, 7, 0.2);
+    }
+    
+    .version-history {
+      margin-top: 12px;
+    }
+    
+    .version-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 12px;
+      margin: 4px 0;
+      background: var(--bg-secondary);
+      border-radius: 6px;
+      font-size: 13px;
+    }
+    
+    @media (max-width: 768px) {
+      body { padding: 16px; }
+      .header { flex-direction: column; gap: 16px; }
+      .header h1 { font-size: 2rem; }
+      .row { flex-direction: column; gap: 16px; }
+      .projects-grid { grid-template-columns: 1fr; }
+    }
   </style>
 </head>
 <body>
-  <h1>🎬 YTLite Projects</h1>
+  <div class="header">
+    <h1>🎬 YTLite Projects</h1>
+    <button class="theme-toggle" onclick="toggleTheme()">
+      <span id="theme-icon">🌙</span>
+      <span id="theme-text">Dark Mode</span>
+    </button>
+  </div>
   
   <div class="create-new" onclick="showCreateForm()">
-    <h2 style="margin: 0 0 8px 0;">➕ Create New Project</h2>
-    <p style="margin: 0;">Generate video content with AI voice and custom themes</p>
+    <h2>➕ Create New Project</h2>
+    <p>Generate video content with AI voice and custom themes</p>
   </div>
   
   <div id="existingProjects" class="box">
@@ -170,9 +495,47 @@ INDEX_HTML = """
     <div><img id="thumb" alt="thumbnail" style="max-width:360px;margin-top:8px;"/></div>
   </div>
 
+  <!-- Version History Modal -->
+  <div id="versionModal" class="box" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); z-index:1000; max-width:600px; max-height:80vh; overflow-y:auto; box-shadow: 0 20px 60px rgba(0,0,0,0.3);">
+    <button onclick="document.getElementById('versionModal').style.display='none'" style="float:right; background:var(--btn-danger); color:white; border:none; padding:8px 12px; border-radius:4px; cursor:pointer;">✕ Close</button>
+    <div id="versionContent"></div>
+  </div>
+
 <script>
 // Load existing projects on page load
-document.addEventListener('DOMContentLoaded', loadProjects);
+document.addEventListener('DOMContentLoaded', function() {
+  loadTheme();
+  loadProjects();
+});
+
+// Theme management
+function toggleTheme() {
+  const body = document.body;
+  const themeIcon = document.getElementById('theme-icon');
+  const themeText = document.getElementById('theme-text');
+  
+  if (body.getAttribute('data-theme') === 'dark') {
+    body.removeAttribute('data-theme');
+    themeIcon.textContent = '🌙';
+    themeText.textContent = 'Dark Mode';
+    localStorage.setItem('ytlite-theme', 'light');
+  } else {
+    body.setAttribute('data-theme', 'dark');
+    themeIcon.textContent = '☀️';
+    themeText.textContent = 'Light Mode';
+    localStorage.setItem('ytlite-theme', 'dark');
+  }
+}
+
+// Load saved theme on page load
+function loadTheme() {
+  const savedTheme = localStorage.getItem('ytlite-theme');
+  if (savedTheme === 'dark') {
+    document.body.setAttribute('data-theme', 'dark');
+    document.getElementById('theme-icon').textContent = '☀️';
+    document.getElementById('theme-text').textContent = 'Light Mode';
+  }
+}
 
 async function loadProjects() {
   try {
@@ -182,17 +545,25 @@ async function loadProjects() {
     
     if (data.projects && data.projects.length > 0) {
       container.innerHTML = '<div class="projects-grid">' + 
-        data.projects.map(project => 
-          '<div class="project-card" onclick="selectProject(\\\'' + project.name + '\\\')">' +
+        data.projects.map(project => {
+          const statusBadge = project.svg ? 
+            '<span class="status-badge status-success">✓ Valid SVG</span>' : 
+            '<span class="status-badge status-warning">⚠ No SVG</span>';
+          
+          const versionInfo = project.versions && project.versions > 1 ? 
+            `<div style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">📝 ${project.versions} versions</div>` : '';
+          
+          return '<div class="project-card" onclick="selectProject(\\\'' + project.name + '\\\')">' +
             '<div class="project-title">' + project.name + '</div>' +
-            '<div class="project-meta">' + (project.svg ? '📄 SVG Package' : '📁 Files') + '</div>' +
+            '<div class="project-meta">' + statusBadge + versionInfo + '</div>' +
             '<div class="project-actions">' + 
               (project.svg ? '<a href="/files/projects/' + project.name + '/' + project.svg + '" target="_blank" class="btn btn-primary">📄 Open SVG</a>' : '') +
               '<a href="/files/projects/' + project.name + '/" target="_blank" class="btn">📂 Files</a>' +
               '<button onclick="editProject(\\\'' + project.name + '\\\')" class="btn">✏️ Edit</button>' +
+              (project.versions && project.versions > 1 ? '<button onclick="showVersionHistory(\\\'' + project.name + '\\\')" class="btn">📜 History</button>' : '') +
             '</div>' +
-          '</div>'
-        ).join('') + '</div>';
+          '</div>';
+        }).join('') + '</div>';
     } else {
       container.innerHTML = '<p>No projects found. Create your first project!</p>';
     }
@@ -266,15 +637,100 @@ async function generate() {
   const data = await res.json();
   clearInterval(timer);
   if (!res.ok) { alert('Error: '+(data.message||res.status)); return; }
+  
+  document.getElementById('progressBox').style.display = 'none';
+  document.getElementById('progmsg').textContent = '';
+  
+  // Validate SVG and show status
+  const svgValidation = await validateProjectSVG(project);
+  const validationStatus = svgValidation.valid ? 
+    '<span class="status-badge status-success">✓ SVG Valid</span>' : 
+    '<span class="status-badge status-warning">⚠ SVG Issues</span>';
+  
+  document.getElementById('links').innerHTML = 
+    `<p><a href="/files/projects/${project}/" target="_blank">📂 Project Files</a> | 
+     <a href="/files/projects/${project}/${project}.svg" target="_blank">📄 SVG Package</a> | 
+     ${validationStatus}</p>`;
+  if (data.video_url) document.getElementById('vid').src = data.video_url;
+  if (data.thumbnail_url) document.getElementById('thumb').src = data.thumbnail_url;
   document.getElementById('preview').style.display = '';
-  document.getElementById('links').innerHTML = `
-    <div><a href="${data.urls.index}" target="_blank">Project index</a> | 
-    <a href="${data.urls.video}" target="_blank">Video</a> | 
-    <a href="${data.urls.audio}" target="_blank">Audio</a></div>`;
-  document.getElementById('vid').src = data.urls.video;
-  document.getElementById('thumb').src = data.urls.thumb;
-  // Reload projects list
-  loadProjects();
+  await loadProjects();
+}
+
+async function validateProjectSVG(projectName) {
+  try {
+    const res = await fetch(`/api/validate_svg?project=${encodeURIComponent(projectName)}`);
+    return await res.json();
+  } catch (e) {
+    console.error('SVG validation failed:', e);
+    return { valid: false, errors: ['Validation request failed'] };
+  }
+}
+
+async function showVersionHistory(projectName) {
+  try {
+    const res = await fetch(`/api/project_history?project=${encodeURIComponent(projectName)}`);
+    const history = await res.json();
+    
+    if (history.versions && history.versions.length > 0) {
+      let historyHtml = `<div class="version-history">
+        <h3>📜 Version History for ${projectName}</h3>`;
+      
+      history.versions.forEach((version, index) => {
+        const isLatest = index === 0;
+        const statusBadge = version.valid ? 
+          '<span class="status-badge status-success">✓ Valid</span>' : 
+          '<span class="status-badge status-warning">⚠ Issues</span>';
+        
+        historyHtml += `<div class="version-item">
+          <div>
+            <strong>Version ${version.version}</strong> ${isLatest ? '<em>(Latest)</em>' : ''}<br>
+            <small>${new Date(version.created_at).toLocaleString()}</small>
+            ${statusBadge}
+          </div>
+          <div>
+            <a href="/files/projects/${projectName}/versions/${version.filename}" target="_blank" class="btn btn-primary">📄 View</a>
+            ${!isLatest ? `<button onclick="restoreVersion('${projectName}', ${version.version})" class="btn">🔄 Restore</button>` : ''}
+          </div>
+        </div>`;
+      });
+      
+      historyHtml += '</div>';
+      
+      // Show in modal or dedicated section
+      document.getElementById('versionContent').innerHTML = historyHtml;
+      document.getElementById('versionModal').style.display = 'block';
+    } else {
+      alert('No version history found for this project.');
+    }
+  } catch (e) {
+    console.error('Failed to load version history:', e);
+    alert('Failed to load version history.');
+  }
+}
+
+async function restoreVersion(projectName, version) {
+  if (!confirm(`Restore ${projectName} to version ${version}? This will create a new version.`)) return;
+  
+  try {
+    const res = await fetch('/api/restore_version', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ project: projectName, version: version })
+    });
+    
+    const result = await res.json();
+    if (res.ok) {
+      alert('Version restored successfully!');
+      document.getElementById('versionModal').style.display = 'none';
+      await loadProjects();
+    } else {
+      alert('Failed to restore version: ' + (result.message || 'Unknown error'));
+    }
+  } catch (e) {
+    console.error('Failed to restore version:', e);
+    alert('Failed to restore version.');
+  }
 }
 
 async function publishWP() {
@@ -343,8 +799,14 @@ def api_generate():
         # Skip dependency verification in FAST_TEST mode to keep tests fast/deterministic
         if os.getenv("YTLITE_FAST_TEST") != "1":
             verify_dependencies()
-        project = request.form.get('project') or (request.json and request.json.get('project'))
-        markdown = request.form.get('markdown') or (request.json and request.json.get('markdown'))
+        # Handle both form data and JSON requests
+        if request.content_type and 'application/json' in request.content_type:
+            data = request.get_json()
+            project = data.get('project') if data else None
+            markdown = data.get('markdown') if data else None
+        else:
+            project = request.form.get('project')
+            markdown = request.form.get('markdown')
         if not project:
             return jsonify({'message': 'Missing project'}), 400
         project = ''.join(c for c in project if c.isalnum() or c in ('_', '-', '.')).strip()
@@ -480,8 +942,161 @@ def api_projects():
     for p in sorted(root.glob('*/')):
         name = p.name
         svg = next(p.glob('*.svg'), None)
-        items.append({"name": name, "svg": svg.name if svg else None})
-    return jsonify({"projects": items})
+        
+        # Check for version history
+        versions_dir = p / 'versions'
+        version_count = len(list(versions_dir.glob('*.svg'))) if versions_dir.exists() else 0
+        
+        # Validate current SVG
+        svg_valid = False
+        if svg:
+            try:
+                import subprocess
+                result = subprocess.run(['xmllint', '--noout', str(svg)], capture_output=True)
+                svg_valid = result.returncode == 0
+            except:
+                svg_valid = False
+        
+        items.append({
+            'name': name,
+            'svg': svg.name if svg else None,
+            'versions': version_count + 1 if svg else 0,  # +1 for current version
+            'svg_valid': svg_valid
+        })
+    return jsonify({'projects': items})
+
+@app.route('/api/validate_svg')
+def api_validate_svg():
+    project = request.args.get('project', '').strip()
+    if not project:
+        return jsonify({'valid': False, 'errors': ['Missing project name']}), 400
+    
+    project_dir = OUTPUT_DIR / 'projects' / project
+    svg_file = next(project_dir.glob('*.svg'), None)
+    
+    if not svg_file:
+        return jsonify({'valid': False, 'errors': ['SVG file not found']})
+    
+    try:
+        import subprocess
+        result = subprocess.run(['xmllint', '--noout', str(svg_file)], 
+                              capture_output=True, text=True)
+        
+        if result.returncode == 0:
+            return jsonify({'valid': True, 'message': 'SVG is valid XML'})
+        else:
+            return jsonify({
+                'valid': False, 
+                'errors': [result.stderr.strip() if result.stderr else 'XML validation failed']
+            })
+    except Exception as e:
+        return jsonify({'valid': False, 'errors': [f'Validation error: {str(e)}']})
+
+@app.route('/api/project_history')
+def api_project_history():
+    project = request.args.get('project', '').strip()
+    if not project:
+        return jsonify({'error': 'Missing project name'}), 400
+    
+    project_dir = OUTPUT_DIR / 'projects' / project
+    versions_dir = project_dir / 'versions'
+    
+    versions = []
+    
+    # Add current version
+    current_svg = next(project_dir.glob('*.svg'), None)
+    if current_svg:
+        try:
+            import subprocess
+            result = subprocess.run(['xmllint', '--noout', str(current_svg)], capture_output=True)
+            valid = result.returncode == 0
+        except:
+            valid = False
+            
+        versions.append({
+            'version': 'current',
+            'filename': current_svg.name,
+            'created_at': datetime.fromtimestamp(current_svg.stat().st_mtime).isoformat(),
+            'valid': valid,
+            'is_current': True
+        })
+    
+    # Add historical versions
+    if versions_dir.exists():
+        for svg_file in sorted(versions_dir.glob('*.svg'), key=lambda x: x.stat().st_mtime, reverse=True):
+            try:
+                import subprocess
+                result = subprocess.run(['xmllint', '--noout', str(svg_file)], capture_output=True)
+                valid = result.returncode == 0
+            except:
+                valid = False
+                
+            # Extract version number from filename
+            version_num = svg_file.stem.split('_v')[-1] if '_v' in svg_file.stem else 'unknown'
+            
+            versions.append({
+                'version': version_num,
+                'filename': f'versions/{svg_file.name}',
+                'created_at': datetime.fromtimestamp(svg_file.stat().st_mtime).isoformat(),
+                'valid': valid,
+                'is_current': False
+            })
+    
+    return jsonify({'versions': versions})
+
+@app.route('/api/restore_version', methods=['POST'])
+def api_restore_version():
+    try:
+        data = request.get_json()
+        project = data.get('project', '').strip()
+        version = data.get('version', '').strip()
+        
+        if not project or not version:
+            return jsonify({'message': 'Missing project or version'}), 400
+        
+        project_dir = OUTPUT_DIR / 'projects' / project
+        versions_dir = project_dir / 'versions'
+        
+        if version == 'current':
+            return jsonify({'message': 'Cannot restore current version'}), 400
+        
+        # Find the version file
+        version_file = None
+        if versions_dir.exists():
+            for svg_file in versions_dir.glob('*.svg'):
+                if f'_v{version}' in svg_file.stem:
+                    version_file = svg_file
+                    break
+        
+        if not version_file or not version_file.exists():
+            return jsonify({'message': 'Version file not found'}), 404
+        
+        # Backup current version before restoring
+        current_svg = next(project_dir.glob('*.svg'), None)
+        if current_svg:
+            # Create versions directory if it doesn't exist
+            versions_dir.mkdir(exist_ok=True)
+            
+            # Generate new version number
+            existing_versions = [f for f in versions_dir.glob('*.svg')]
+            next_version = len(existing_versions) + 1
+            
+            backup_name = f"{current_svg.stem}_v{next_version}.svg"
+            backup_path = versions_dir / backup_name
+            
+            # Copy current to versions
+            import shutil
+            shutil.copy2(current_svg, backup_path)
+        
+        # Restore the selected version
+        import shutil
+        shutil.copy2(version_file, project_dir / f"{project}.svg")
+        
+        return jsonify({'message': f'Version {version} restored successfully'})
+        
+    except Exception as e:
+        logger.error(f"Failed to restore version: {e}")
+        return jsonify({'message': f'Failed to restore version: {str(e)}'}), 500
 
 @app.route('/api/svg_meta')
 def api_svg_meta():

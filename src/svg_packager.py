@@ -96,7 +96,7 @@ def build_svg(project_dir: str | Path, metadata: dict, paragraphs: list,
       <div style="padding:20px;">
         <!-- Video Player -->
         <div style="text-align:center; margin-bottom:20px;">
-          <video id="mainVideo" controls autoplay style="max-width:100%; height:auto; background:#000;">
+          <video id="mainVideo" controls="controls" autoplay="autoplay" style="max-width:100%; height:auto; background:#000;">
             <source src="{video_uri}" type="video/mp4"/>
             Your browser does not support the video tag.
           </video>
