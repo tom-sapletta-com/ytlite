@@ -941,7 +941,7 @@ def serve_files(filepath):
         return send_from_directory(OUTPUT_DIR, filepath, mimetype=mime_type)
     except Exception as e:
         logger.error(f"Error serving file {filepath}: {e}")
-        return f"File not found: {filepath}", 404
+        return 'Server error', 500
 
 @app.route('/api/generate', methods=['POST'])
 def api_generate():
@@ -1012,14 +1012,20 @@ def api_generate():
             audio_path = proj_dir / "audio.mp3"
             thumb_path = proj_dir / "thumbnail.jpg"
             
-            # Prepare metadata
+            # Prepare metadata (ensure variables are defined)
+            voice_value = v if 'v' in locals() and v else 'en-US-AriaNeural'
+            theme_value = th if 'th' in locals() and th else 'default'
+            template_value = t if 't' in locals() and t else 'simple'
+            font_size_value = fs if 'fs' in locals() and fs else '32'
+            lang_value = lg if 'lg' in locals() and lg else 'en'
+            
             metadata = {
                 'title': project,
-                'voice': v or 'en-US-AriaNeural',
-                'theme': th or 'default',
-                'template': t or 'simple',
-                'font_size': fs or '32',
-                'language': lg or 'en',
+                'voice': voice_value,
+                'theme': theme_value,
+                'template': template_value,
+                'font_size': font_size_value,
+                'language': lang_value,
                 'markdown_content': markdown,
                 'generated': datetime.now().isoformat()
             }
