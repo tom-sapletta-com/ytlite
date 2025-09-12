@@ -94,20 +94,11 @@ dev-watch: ## Watch for changes and auto-generate (local)
 automation: ## Start automation scheduler (local)
 	@bash scripts/automation.sh
 
-test: ## Run local Python tests
-	bash scripts/test.sh
-
-test-e2e: ## Run E2E pytest suite quietly
-	pytest -q
-
 stats: ## Show project statistics
 	@bash scripts/stats.sh
 
 clean: ## Clean generated files
 	@bash scripts/clean.sh
-
-validate: ## Validate generated data and app setup
-	bash scripts/validate.sh || { echo "$(YELLOW)Validation completed with non-critical errors. Continuing...$(NC)"; exit 0; }
 
 # Lightweight app smoke test: deps + generate sample + verify packaging
 validate-app: ## Validate application health (deps + smoke generate + project packaging)
@@ -130,6 +121,9 @@ test-data: ## Test project folders, media, and SVG files for errors and remove f
 
 test: ## Run automated tests
 	bash scripts/test.sh
+
+test-e2e: ## Run E2E pytest suite quietly  
+	pytest -q
 
 # ==============================================================================
 # PUBLISHING

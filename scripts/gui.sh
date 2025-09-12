@@ -24,7 +24,12 @@ python src/ytlite_web_gui.py || {
             echo "Trying to start on port 5002..."
             FLASK_PORT=5002 python src/ytlite_web_gui.py || {
                 echo "Failed to start on port 5002. Check if the port is in use."
-                exit 1
+                # Try starting on port 5003 if 5002 is in use
+                echo "Trying to start on port 5003..."
+                FLASK_PORT=5003 python src/ytlite_web_gui.py || {
+                    echo "Failed to start on port 5003. Check if the port is in use."
+                    exit 1
+                }
             }
         }
     }

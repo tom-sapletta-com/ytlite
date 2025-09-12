@@ -11,7 +11,7 @@ from pathlib import Path
 current_dir = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, current_dir)
 
-from flask import Flask
+from flask import Flask, send_from_directory
 from rich.console import Console
 
 console = Console()
@@ -35,7 +35,7 @@ def create_production_app():
     
     # Import and setup all routes
     try:
-        from web_gui.routes import setup_routes
+        from web_gui.routes import *
         setup_routes(app, base_dir, output_dir)
         
         route_count = len(list(app.url_map.iter_rules()))
@@ -56,15 +56,16 @@ def create_production_app():
         console.print(f"[red]❌ Routes setup failed: {e}[/red]")
         raise
     
-    # Setup JavaScript serving
-    @app.route('/static/js/web_gui.js')
-    def serve_javascript():
-        try:
-            from web_gui.javascript import JAVASCRIPT_CODE
-            return JAVASCRIPT_CODE, 200, {'Content-Type': 'application/javascript; charset=utf-8'}
-        except Exception as e:
-            console.print(f"[red]❌ JavaScript serving error: {e}[/red]")
-            return f"// JavaScript loading error: {e}", 500, {'Content-Type': 'application/javascript'}
+    # Import JavaScript serving route - rename to avoid conflict
+    try:
+        from web_gui.javascript import serve_js as serve_javascript_unique
+        app.route('/static/js/<path:path>')(serve_javascript_unique)
+    except ImportError:
+        logger.warning("JavaScript serving route not available")
+        # Fallback to static serving if module not found
+        @app.route('/static/js/<path:path>')
+        def serve_static_js(path):
+            return send_from_directory('web_static/static/js', path)
     
     # Add health check endpoint
     @app.route('/health')
