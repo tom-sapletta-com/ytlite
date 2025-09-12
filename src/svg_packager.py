@@ -13,6 +13,7 @@ import json
 from pathlib import Path
 from typing import Optional
 from datetime import datetime, timezone
+import shutil
 
 
 def _b64_data_uri(path: Path, mime: str) -> str:
@@ -21,11 +22,110 @@ def _b64_data_uri(path: Path, mime: str) -> str:
     return f"data:{mime};base64,{b64}"
 
 
+def _backup_current_version(project_dir: Path, svg_path: Path) -> None:
+    """Create a versioned backup of the current SVG file."""
+    versions_dir = project_dir / 'versions'
+    versions_dir.mkdir(exist_ok=True)
+    
+    # Find next version number
+    existing_versions = list(versions_dir.glob('*.svg'))
+    next_version = len(existing_versions) + 1
+    
+    # Create backup filename
+    backup_name = f"{svg_path.stem}_v{next_version}.svg"
+    backup_path = versions_dir / backup_name
+    
+    # Copy current SVG to versions directory
+    shutil.copy2(svg_path, backup_path)
+    print(f"Created version backup: {backup_path}")
+
+
+def _validate_svg(svg_path: Path) -> tuple[bool, list[str]]:
+    """Validate SVG file using xmllint if available."""
+    try:
+        import subprocess
+        result = subprocess.run(['xmllint', '--noout', str(svg_path)], 
+                              capture_output=True, text=True)
+        
+        if result.returncode == 0:
+            return True, []
+        else:
+            errors = [result.stderr.strip()] if result.stderr else ['XML validation failed']
+            return False, errors
+    except FileNotFoundError:
+        # xmllint not available, do basic checks
+        try:
+            content = svg_path.read_text()
+            if not content.strip().startswith('<svg'):
+                return False, ['File does not start with <svg tag']
+            if '</svg>' not in content:
+                return False, ['Missing closing </svg> tag']
+            return True, ['Basic validation passed (xmllint not available)']
+        except Exception as e:
+            return False, [f'Failed to read SVG file: {str(e)}']
+
+
+def _fix_common_xml_issues(svg_content: str) -> str:
+    """Fix common XML issues in SVG content."""
+    import re
+    
+    # Fix boolean attributes that need explicit values in XML
+    fixes = [
+        (r'<video\s+([^>]*\s+)?controls(\s+[^>]*)?>', r'<video \1controls="controls"\2>'),
+        (r'<audio\s+([^>]*\s+)?controls(\s+[^>]*)?>', r'<audio \1controls="controls"\2>'),
+        (r'<video\s+([^>]*\s+)?autoplay(\s+[^>]*)?>', r'<video \1autoplay="autoplay"\2>'),
+        (r'<audio\s+([^>]*\s+)?autoplay(\s+[^>]*)?>', r'<audio \1autoplay="autoplay"\2>'),
+        (r'<[^>]+\s+loop(\s+[^>]*)?>', lambda m: m.group(0).replace(' loop', ' loop="loop"')),
+        (r'<[^>]+\s+muted(\s+[^>]*)?>', lambda m: m.group(0).replace(' muted', ' muted="muted"')),
+    ]
+    
+    fixed_content = svg_content
+    for pattern, replacement in fixes:
+        fixed_content = re.sub(pattern, replacement, fixed_content)
+    
+    # Escape special characters in text content
+    # (This is a simplified version - in production you'd want more comprehensive escaping)
+    fixed_content = fixed_content.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
+    # But restore valid XML tags
+    fixed_content = re.sub(r'&lt;(\/?[a-zA-Z][^&]*?)&gt;', r'<\1>', fixed_content)
+    
+    return fixed_content
+
+
+def validate_and_fix_svg(svg_path: Path) -> tuple[bool, list[str]]:
+    """Validate SVG and attempt to fix common issues if validation fails."""
+    is_valid, errors = _validate_svg(svg_path)
+    
+    if not is_valid:
+        print("🔧 Attempting to fix common XML issues...")
+        content = svg_path.read_text(encoding="utf-8")
+        fixed_content = _fix_common_xml_issues(content)
+        
+        if fixed_content != content:
+            svg_path.write_text(fixed_content, encoding="utf-8")
+            is_valid, errors = _validate_svg(svg_path)
+            
+            if is_valid:
+                print(f"✓ Successfully fixed XML issues in: {svg_path}")
+            else:
+                print(f"⚠ Issues remain after automatic fix")
+    
+    return is_valid, errors
+
+
 def build_svg(project_dir: str | Path, metadata: dict, paragraphs: list,
-              video_path: str | None, audio_path: str | None, thumb_path: str | None) -> Path:
+              video_path: str | None, audio_path: str | None, thumb_path: str | None) -> tuple[Path, bool, list[str]]:
+    """
+    Build SVG with comprehensive validation.
+    Returns: (svg_path, is_valid, validation_errors)
+    """
     pdir = Path(project_dir)
     name = pdir.name
     svg_path = pdir / f"{name}.svg"
+    
+    # Create version backup if SVG already exists
+    if svg_path.exists():
+        _backup_current_version(pdir, svg_path)
 
     # Visible content: thumbnail image if present
     width, height = 1280, 720
@@ -124,7 +224,7 @@ def build_svg(project_dir: str | Path, metadata: dict, paragraphs: list,
         <!-- Audio Player -->
         <div style="background:#2a2a2a; padding:15px; border-radius:8px;">
           <h3 style="color:#00ff88; margin-top:0;">Audio:</h3>
-          <audio controls style="width:100%;">
+          <audio controls="controls" style="width:100%;">
             <source src="{audio_uri}" type="audio/mpeg"/>
             Your browser does not support the audio tag.
           </audio>
@@ -138,41 +238,94 @@ def build_svg(project_dir: str | Path, metadata: dict, paragraphs: list,
 </svg>
 """.strip()
 
+    # Write SVG content
     svg_path.write_text(svg, encoding="utf-8")
-    return svg_path
+    
+    # Validate the generated SVG
+    is_valid, errors = _validate_svg(svg_path)
+    if is_valid:
+        print(f"✓ Generated valid SVG: {svg_path}")
+    else:
+        print(f"⚠ SVG validation issues in {svg_path}:")
+        for error in errors:
+            print(f"  - {error}")
+        
+        # Attempt automatic fix for common issues
+        print("🔧 Attempting to fix common XML issues...")
+        fixed_svg = _fix_common_xml_issues(svg)
+        if fixed_svg != svg:
+            svg_path.write_text(fixed_svg, encoding="utf-8")
+            is_valid, errors = _validate_svg(svg_path)
+            if is_valid:
+                print(f"✓ Successfully fixed and validated SVG: {svg_path}")
+            else:
+                print(f"⚠ Issues remain after automatic fix:")
+                for error in errors:
+                    print(f"  - {error}")
+    
+    return svg_path, is_valid, errors
 
 
 def update_svg_media(svg_path: str | Path, video_path: Optional[str] = None,
-                     audio_path: Optional[str] = None, thumb_path: Optional[str] = None) -> bool:
+                     audio_path: Optional[str] = None, thumb_path: Optional[str] = None) -> tuple[bool, bool, list[str]]:
+    """
+    Update SVG media content with validation.
+    Returns: (operation_success, is_valid, validation_errors)
+    """
     p = Path(svg_path)
     if not p.exists():
-        return False
+        return False, False, ['SVG file not found']
+    
+    # Create backup before editing
+    if p.exists():
+        _backup_current_version(p.parent, p)
+    
     txt = p.read_text(encoding="utf-8")
     # Naive replacement of the JSON block; parse and update
     import re
     m = re.search(r"<script type=\"application/json\">(.*?)</script>", txt, flags=re.S)
     if not m:
-        return False
+        return False, False, ['No JSON metadata block found in SVG']
+    
     js = m.group(1).replace("&lt;", "<")
     try:
         meta = json.loads(js)
-    except Exception:
-        return False
+    except Exception as e:
+        return False, False, [f'Failed to parse JSON metadata: {str(e)}']
+        
+    # Update media content
     if video_path and Path(video_path).exists():
         meta.setdefault("media", {})["video_mp4"] = _b64_data_uri(Path(video_path), "video/mp4")
+        print(f"Updated video content from {video_path}")
+        
     if audio_path and Path(audio_path).exists():
         meta.setdefault("media", {})["audio_mp3"] = _b64_data_uri(Path(audio_path), "audio/mpeg")
+        print(f"Updated audio content from {audio_path}")
+        
     if thumb_path and Path(thumb_path).exists():
         meta.setdefault("media", {})["thumbnail_jpg"] = _b64_data_uri(Path(thumb_path), "image/jpeg")
         # Also update visible image href
         new_thumb = meta["media"]["thumbnail_jpg"]
         txt = re.sub(r'(<image[^>]*id="thumb"[^>]*href=")[^"]*(")',
                      r'\1' + new_thumb + r'\2', txt)
-    # Write back
+        print(f"Updated thumbnail from {thumb_path}")
+    
+    # Write back updated content
     new_json = json.dumps(meta, ensure_ascii=False).replace("<", "&lt;")
     new_txt = txt[:m.start(1)] + new_json + txt[m.end(1):]
     p.write_text(new_txt, encoding="utf-8")
-    return True
+    
+    # Validate the updated SVG
+    is_valid, errors = validate_and_fix_svg(p)
+    
+    if is_valid:
+        print(f"✓ SVG media updated and validated: {p}")
+    else:
+        print(f"⚠ SVG validation issues after media update:")
+        for error in errors:
+            print(f"  - {error}")
+    
+    return True, is_valid, errors
 
 
 def parse_svg_meta(svg_path: str | Path) -> Optional[dict]:

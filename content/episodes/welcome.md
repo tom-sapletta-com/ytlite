@@ -1,9 +1,9 @@
 ---
-title: YTLite: Minimalistyczny pipeline do produkcji content
-date: 2025-01-15
+title: welcome
+date: 2025-09-12
 theme: tech
-tags: ['ytlite', 'automation', 'minimalism', 'tech']
+template: classic
+voice: de-DE-KillianNeural
 ---
-
 
 Czas na rewolucję w tworzeniu contentu!

@@ -21,6 +21,7 @@ from content_parser import ContentParser
 from audio_generator import AudioGenerator
 from video_generator import VideoGenerator
 from svg_packager import build_svg
+from svg_validator import SVGOperationManager, validate_all_project_svgs
 
 # Load environment variables
 load_dotenv()
@@ -250,8 +251,28 @@ class YTLite:
         description_body = "\n\n".join(paragraphs) if paragraphs else metadata.get('title', base_name)
         (project_dir / "description.md").write_text("\n".join(fm_lines) + description_body + "\n", encoding="utf-8")
 
-        # Create SVG single-file package
-        svg_path = build_svg(project_dir, metadata, paragraphs, video_path, audio_path, thumbnail_path)
+        # Create SVG single-file package with validation
+        logger.info("Packaging start")
+        svg_path, is_valid, validation_errors = build_svg(project_dir, metadata, paragraphs, video_path, audio_path, thumbnail_path)
+        
+        # Report validation results
+        if is_valid:
+            logger.info(f"✓ SVG generated and validated successfully: {svg_path}")
+        else:
+            logger.warning(f"⚠ SVG validation issues found:")
+            for error in validation_errors:
+                logger.warning(f"  - {error}")
+        
+        # Validate all project SVGs for comprehensive check
+        validation_results = validate_all_project_svgs(project_dir)
+        invalid_count = sum(1 for is_valid, _ in validation_results.values() if not is_valid)
+        
+        if invalid_count == 0:
+            logger.info(f"✓ All {len(validation_results)} SVG files in project are valid")
+        else:
+            logger.warning(f"⚠ {invalid_count} of {len(validation_results)} SVG files have validation issues")
+        
+        logger.info("Packaging done")
 
         # Create a simple index.md to navigate assets (if not SVG-only)
         index_md = f"""

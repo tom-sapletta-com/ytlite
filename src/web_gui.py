@@ -561,6 +561,7 @@ async function loadProjects() {
               '<a href="/files/projects/' + project.name + '/" target="_blank" class="btn">📂 Files</a>' +
               '<button onclick="editProject(\\\'' + project.name + '\\\')" class="btn">✏️ Edit</button>' +
               (project.versions && project.versions > 1 ? '<button onclick="showVersionHistory(\\\'' + project.name + '\\\')" class="btn">📜 History</button>' : '') +
+              '<button onclick="deleteProject(\\\'' + project.name + '\\\')" class="btn btn-danger" style="margin-left: 8px;">🗑️ Delete</button>' +
             '</div>' +
           '</div>';
         }).join('') + '</div>';
@@ -641,16 +642,39 @@ async function generate() {
   document.getElementById('progressBox').style.display = 'none';
   document.getElementById('progmsg').textContent = '';
   
-  // Validate SVG and show status
+  // Validate SVG and show detailed status
   const svgValidation = await validateProjectSVG(project);
-  const validationStatus = svgValidation.valid ? 
-    '<span class="status-badge status-success">✓ SVG Valid</span>' : 
-    '<span class="status-badge status-warning">⚠ SVG Issues</span>';
+  
+  let validationDetails = '';
+  if (svgValidation.valid) {
+    validationDetails = '<span class="status-badge status-success">✓ All SVG files valid</span>';
+    
+    // Show validation details for all files if available
+    if (svgValidation.all_files) {
+      const fileCount = Object.keys(svgValidation.all_files).length;
+      validationDetails += ` <small>(${fileCount} files checked)</small>`;
+    }
+  } else {
+    validationDetails = '<span class="status-badge status-warning">⚠ SVG validation issues</span>';
+    
+    // Show specific error details
+    if (svgValidation.errors && svgValidation.errors.length > 0) {
+      const errorSummary = svgValidation.errors.slice(0, 2).join('; ');
+      validationDetails += `<br><small style="color: #ff6b6b;">${errorSummary}</small>`;
+    }
+    
+    // Show auto-fix status if issues were found
+    validationDetails += '<br><small>🔧 Auto-fix attempted during generation</small>';
+  }
   
   document.getElementById('links').innerHTML = 
-    `<p><a href="/files/projects/${project}/" target="_blank">📂 Project Files</a> | 
-     <a href="/files/projects/${project}/${project}.svg" target="_blank">📄 SVG Package</a> | 
-     ${validationStatus}</p>`;
+    `<div style="margin-bottom: 15px;">
+      <p><a href="/files/projects/${project}/" target="_blank" class="btn">📂 Project Files</a> 
+         <a href="/files/projects/${project}/${project}.svg" target="_blank" class="btn btn-primary">📄 SVG Package</a></p>
+      <div style="padding: 10px; background: var(--bg-secondary); border-radius: 6px;">
+        ${validationDetails}
+      </div>
+    </div>`;
   if (data.video_url) document.getElementById('vid').src = data.video_url;
   if (data.thumbnail_url) document.getElementById('thumb').src = data.thumbnail_url;
   document.getElementById('preview').style.display = '';
@@ -978,18 +1002,29 @@ def api_validate_svg():
         return jsonify({'valid': False, 'errors': ['SVG file not found']})
     
     try:
-        import subprocess
-        result = subprocess.run(['xmllint', '--noout', str(svg_file)], 
-                              capture_output=True, text=True)
+        # Use enhanced validation from svg_validator
+        from svg_validator import validate_all_project_svgs
+        validation_results = validate_all_project_svgs(project_dir)
         
-        if result.returncode == 0:
-            return jsonify({'valid': True, 'message': 'SVG is valid XML'})
-        else:
+        # Get main SVG validation result
+        main_svg_name = svg_file.name
+        if main_svg_name in validation_results:
+            is_valid, errors = validation_results[main_svg_name]
+            
             return jsonify({
-                'valid': False, 
-                'errors': [result.stderr.strip() if result.stderr else 'XML validation failed']
+                'valid': is_valid,
+                'errors': errors if not is_valid else [],
+                'message': 'SVG is valid XML' if is_valid else 'SVG validation failed',
+                'all_files': {
+                    filename: {'valid': valid, 'errors': errs}
+                    for filename, (valid, errs) in validation_results.items()
+                }
             })
+        else:
+            return jsonify({'valid': False, 'errors': ['Could not validate SVG file']})
+            
     except Exception as e:
+        logger.error(f"SVG validation error: {e}")
         return jsonify({'valid': False, 'errors': [f'Validation error: {str(e)}']})
 
 @app.route('/api/project_history')
@@ -1097,6 +1132,40 @@ def api_restore_version():
     except Exception as e:
         logger.error(f"Failed to restore version: {e}")
         return jsonify({'message': f'Failed to restore version: {str(e)}'}), 500
+
+@app.route('/api/delete_project', methods=['POST'])
+def api_delete_project():
+    """Delete a project and all its files."""
+    try:
+        data = request.get_json()
+        project = data.get('project', '').strip()
+        confirm = data.get('confirm', False)
+        
+        if not project:
+            return jsonify({'message': 'Missing project name'}), 400
+            
+        if not confirm:
+            return jsonify({'message': 'Confirmation required for deletion'}), 400
+        
+        project_dir = OUTPUT_DIR / 'projects' / project
+        
+        if not project_dir.exists():
+            return jsonify({'message': 'Project not found'}), 404
+        
+        # Security check: ensure we're only deleting within projects directory
+        if not str(project_dir.resolve()).startswith(str((OUTPUT_DIR / 'projects').resolve())):
+            return jsonify({'message': 'Invalid project path'}), 400
+        
+        # Delete the entire project directory
+        import shutil
+        shutil.rmtree(project_dir)
+        
+        logger.info(f"Project deleted: {project}")
+        return jsonify({'message': f'Project "{project}" deleted successfully'})
+        
+    except Exception as e:
+        logger.error(f"Failed to delete project: {e}")
+        return jsonify({'message': f'Failed to delete project: {str(e)}'}), 500
 
 @app.route('/api/svg_meta')
 def api_svg_meta():
