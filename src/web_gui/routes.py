@@ -44,10 +44,27 @@ def setup_routes(app: Flask, base_dir: Path, output_dir: Path):
             return p.read_text(encoding='utf-8'), 200, {'Content-Type': 'text/markdown; charset=utf-8'}
         return 'No output yet', 404
 
+    @app.route('/health')
+    def health():
+        """Health check endpoint."""
+        return '', 204
+
     @app.route('/favicon.ico')
     def favicon():
         """Handle favicon requests"""
         return '', 204
+
+    @app.route('/static/js/web_gui.js')
+    def serve_javascript():
+        """Serve the JavaScript content."""
+        from web_gui.javascript import get_javascript_content
+        return get_javascript_content(), 200, {'Content-Type': 'application/javascript'}
+
+    @app.route('/main.js')
+    def serve_main_js():
+        """Alternative route for JavaScript content."""
+        from web_gui.javascript import get_javascript_content
+        return get_javascript_content(), 200, {'Content-Type': 'application/javascript'}
 
     @app.route('/files/<path:filepath>')
     def serve_files(filepath):
