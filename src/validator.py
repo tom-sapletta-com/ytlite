@@ -264,7 +264,7 @@ class VideoValidator:
         for item in report["results"]:
             for key in list(item.keys()):
                 if isinstance(item[key], bool):
-                    item[key] = str(item[key])
+                    item[key] = int(item[key])
                 elif not isinstance(item[key], (str, int, float, list, dict, type(None))):
                     item[key] = str(item[key])
         
@@ -314,7 +314,7 @@ class VideoValidator:
         console.print(table)
 
 class Validator:
-    def __init__(self, project_dir):
+    def __init__(self, project_dir: str = '.'):
         self.project_dir = project_dir
         self.reports_dir = os.path.join(project_dir, 'reports')
         os.makedirs(self.reports_dir, exist_ok=True)
