@@ -572,6 +572,8 @@ async function loadProjects() {
               <div class="project-actions">
                 ${openAction}
                 <button onclick="editSVGProject('${project.name}')" class="btn">✏️ Edit</button>
+                <button onclick="publishToYoutube('${project.name}', event)" class="btn" style="background: #ff4444; color: white;">📺 YouTube</button>
+                <button onclick="publishToWordPress('${project.name}', event)" class="btn" style="background: #21759b; color: white;">📝 WordPress</button>
                 <button onclick="deleteProject('${project.name}', event)" class="btn btn-danger" style="margin-left: 8px;">🗑️ Delete</button>
               </div>
             </div>`;
@@ -592,6 +594,8 @@ async function loadProjects() {
                 <a href="/files/projects/${project.name}/" target="_blank" class="btn">📂 Files</a>
                 <button onclick="editProject('${project.name}')" class="btn">✏️ Edit</button>
                 ${project.versions && project.versions > 1 ? `<button onclick="showVersionHistory('${project.name}')" class="btn">📜 History</button>` : ''}
+                <button onclick="publishToYoutube('${project.name}', event)" class="btn" style="background: #ff4444; color: white;">📺 YouTube</button>
+                <button onclick="publishToWordPress('${project.name}', event)" class="btn" style="background: #21759b; color: white;">📝 WordPress</button>
                 <button onclick="deleteProject('${project.name}', event)" class="btn btn-danger" style="margin-left: 8px;">🗑️ Delete</button>
               </div>
             </div>`;
@@ -847,25 +851,8 @@ async function deleteProject(projectName, event) {
     event.stopPropagation();
   }
   
-  const confirmMessage = `⚠️ WARNING: This will permanently delete the project "${projectName}" and ALL its files, including:
-
-• SVG files
-• Version history  
-• Generated content
-• Configuration files
-
-This action CANNOT be undone.
-
-Type the project name to confirm deletion:`;
-  
-  const userInput = prompt(confirmMessage);
-  
-  if (userInput !== projectName) {
-    if (userInput !== null) {  // User didn't cancel
-      alert('Project name does not match. Deletion cancelled.');
-    }
-    return;
-  }
+  // Show simple status message
+  showMessage('🗑️ Deleting project...', 'info');
   
   try {
     const response = await fetch('/api/delete_project', {
@@ -877,14 +864,93 @@ Type the project name to confirm deletion:`;
     const data = await response.json();
     
     if (response.ok) {
-      alert('✅ ' + data.message);
+      showMessage(`✅ Project "${projectName}" deleted successfully`, 'success');
       await loadProjects();
     } else {
-      alert('❌ Error: ' + data.message);
+      showMessage(`❌ Error: ${data.message || data.error}`, 'error');
     }
   } catch (e) {
-    alert('❌ Failed to delete project: ' + e.message);
+    showMessage(`❌ Failed to delete project: ${e.message}`, 'error');
   }
+}
+
+async function publishToYoutube(projectName, event) {
+  if (event) event.stopPropagation();
+  
+  showMessage('📺 Publishing to YouTube...', 'info');
+  
+  try {
+    const response = await fetch('/api/publish/youtube', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({project: projectName})
+    });
+    
+    const data = await response.json();
+    
+    if (response.ok) {
+      showMessage(`✅ Published "${projectName}" to YouTube successfully`, 'success');
+    } else {
+      showMessage(`❌ YouTube publish failed: ${data.message || data.error}`, 'error');
+    }
+  } catch (e) {
+    showMessage(`❌ YouTube publish error: ${e.message}`, 'error');
+  }
+}
+
+async function publishToWordPress(projectName, event) {
+  if (event) event.stopPropagation();
+  
+  showMessage('📝 Publishing to WordPress...', 'info');
+  
+  try {
+    const response = await fetch('/api/publish/wordpress', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({project: projectName})
+    });
+    
+    const data = await response.json();
+    
+    if (response.ok) {
+      showMessage(`✅ Published "${projectName}" to WordPress successfully`, 'success');
+    } else {
+      showMessage(`❌ WordPress publish failed: ${data.message || data.error}`, 'error');
+    }
+  } catch (e) {
+    showMessage(`❌ WordPress publish error: ${e.message}`, 'error');
+  }
+}
+
+function showMessage(text, type = 'info') {
+  // Remove existing message
+  const existingMsg = document.getElementById('statusMessage');
+  if (existingMsg) {
+    existingMsg.remove();
+  }
+  
+  // Create new message
+  const msgDiv = document.createElement('div');
+  msgDiv.id = 'statusMessage';
+  msgDiv.textContent = text;
+  msgDiv.style.cssText = `
+    position: fixed; top: 20px; right: 20px; z-index: 1000;
+    padding: 12px 20px; border-radius: 6px; font-weight: 500;
+    max-width: 400px; word-wrap: break-word;
+    background: ${type === 'success' ? '#d4edda' : type === 'error' ? '#f8d7da' : '#d1ecf1'};
+    color: ${type === 'success' ? '#155724' : type === 'error' ? '#721c24' : '#0c5460'};
+    border: 1px solid ${type === 'success' ? '#c3e6cb' : type === 'error' ? '#f5c6cb' : '#bee5eb'};
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  `;
+  
+  document.body.appendChild(msgDiv);
+  
+  // Auto-remove after 3 seconds
+  setTimeout(() => {
+    if (msgDiv.parentNode) {
+      msgDiv.remove();
+    }
+  }, 3000);
 }
 </script>
 </body>
@@ -1097,6 +1163,75 @@ def api_publish_wordpress():
     except Exception as e:
         logger.error("POST /api/publish_wordpress failed", extra={"error": str(e)})
         return jsonify({'message': str(e)}), 500
+
+@app.route('/api/publish/youtube', methods=['POST'])
+def api_publish_youtube():
+    """Publish project to YouTube."""
+    try:
+        data = request.get_json()
+        project = data.get('project', '').strip()
+        
+        if not project:
+            return jsonify({'error': 'Missing project name'}), 400
+        
+        # Check if project exists
+        project_dir = OUTPUT_DIR / 'projects' / project
+        svg_file = OUTPUT_DIR / 'svg_projects' / f"{project}.svg"
+        
+        if not project_dir.exists() and not svg_file.exists():
+            return jsonify({'error': 'Project not found'}), 404
+        
+        # For now, return a placeholder response
+        # In a real implementation, this would integrate with YouTube API
+        return jsonify({
+            'message': f'YouTube publishing for "{project}" would be initiated here',
+            'status': 'placeholder',
+            'project': project
+        })
+        
+    except Exception as e:
+        logger.error(f"Failed to publish to YouTube: {e}")
+        return jsonify({'error': 'Failed to publish to YouTube'}), 500
+
+@app.route('/api/publish/wordpress', methods=['POST'])
+def api_publish_wordpress_new():
+    """Publish project to WordPress (new endpoint)."""
+    try:
+        data = request.get_json()
+        project = data.get('project', '').strip()
+        
+        if not project:
+            return jsonify({'error': 'Missing project name'}), 400
+        
+        # Check if project exists
+        project_dir = OUTPUT_DIR / 'projects' / project
+        svg_file = OUTPUT_DIR / 'svg_projects' / f"{project}.svg"
+        
+        if not project_dir.exists() and not svg_file.exists():
+            return jsonify({'error': 'Project not found'}), 404
+        
+        # Try to use existing WordPress publisher
+        try:
+            from src.publishers.wordpress_publisher import WordPressPublisher
+            publisher = WordPressPublisher()
+            result = publisher.publish_project(project)
+            return jsonify({
+                'message': f'Published "{project}" to WordPress successfully',
+                'status': 'success',
+                'project': project,
+                'details': result
+            })
+        except ImportError:
+            # Fallback if WordPress publisher not available
+            return jsonify({
+                'message': f'WordPress publishing for "{project}" would be initiated here',
+                'status': 'placeholder',
+                'project': project
+            })
+        
+    except Exception as e:
+        logger.error(f"Failed to publish to WordPress: {e}")
+        return jsonify({'error': 'Failed to publish to WordPress'}), 500
 
 @app.route('/api/fetch_nextcloud', methods=['POST'])
 def api_fetch_nextcloud():

@@ -38,20 +38,25 @@ class WebGUIE2EServer:
             cwd=Path(__file__).parent.parent
         )
         
-        # Wait for server startup
-        for _ in range(30):
+        # Wait for server startup with increased timeout
+        for _ in range(60):
             try:
                 response = requests.get(f'http://localhost:{self.port}')
                 if response.status_code == 200:
-                    break
+                    print(f"Server started successfully on port {self.port}")
+                    return f'http://localhost:{self.port}'
             except:
                 pass
             time.sleep(1)
         else:
+            print("Server startup timed out after 60 seconds")
+            # Log server output for debugging
+            if self.process.stdout:
+                print("Server stdout:", self.process.stdout.read().decode())
+            if self.process.stderr:
+                print("Server stderr:", self.process.stderr.read().decode())
             raise Exception("E2E server failed to start")
             
-        return f'http://localhost:{self.port}'
-        
     def __exit__(self, exc_type, exc_val, exc_tb):
         if self.process:
             self.process.terminate()

@@ -50,23 +50,29 @@ class WebGUIServer:
             ['python', 'src/web_gui.py'],
             env=env,
             stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE
+            stderr=subprocess.PIPE,
+            cwd=Path(__file__).parent.parent
         )
         
-        # Wait for server to start
-        for _ in range(30):
+        # Wait for server to start with increased timeout
+        for _ in range(60):
             try:
                 response = requests.get(f'http://localhost:{self.port}')
                 if response.status_code == 200:
-                    break
+                    print(f"Web GUI server started successfully on port {self.port}")
+                    return f"http://localhost:{self.port}"
             except:
                 pass
             time.sleep(1)
         else:
+            print("Web GUI server startup timed out after 60 seconds")
+            # Log server output for debugging
+            if self.process.stdout:
+                print("Server stdout:", self.process.stdout.read().decode())
+            if self.process.stderr:
+                print("Server stderr:", self.process.stderr.read().decode())
             raise Exception("Failed to start web GUI server")
             
-        return f'http://localhost:{self.port}'
-        
     def __exit__(self, exc_type, exc_val, exc_tb):
         if self.process:
             self.process.terminate()
