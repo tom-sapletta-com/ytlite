@@ -157,48 +157,68 @@ class VideoGenerator:
         console.print(f"[cyan]Creating video from {len(slides)} slides...[/]")
         logger.info("Create video start", extra={"slides": len(slides), "audio": audio_path, "output": output_path})
         
-        # Load audio to get duration
-        audio = AudioFileClip(audio_path)
-        total_duration = audio.duration
-        slide_duration = total_duration / len(slides)
-        
-        # Create video clips from slides
-        clips = []
-        for slide_path in slides:
-            clip = ImageClip(slide_path).set_duration(slide_duration)
-            clips.append(clip)
-        
-        # Concatenate clips
-        video = concatenate_videoclips(clips, method="compose")
-        
-        # Add audio
-        final_video = video.set_audio(audio)
-        
-        # Write output
-        console.print(f"[cyan]Writing video to {output_path}...[/]")
         try:
-            final_video.write_videofile(
-                output_path,
-                fps=self.fps,
-                codec="libx264",
-                audio_codec="aac",
-                logger=None,  
-                temp_audiofile='temp-audio.m4a',
-                remove_temp=True
-            )
+            # Load audio to get duration
+            audio = AudioFileClip(audio_path)
+            total_duration = audio.duration
+            slide_duration = total_duration / len(slides)
+            
+            # Create video clips from slides
+            clips = []
+            for slide_path in slides:
+                try:
+                    clip = ImageClip(slide_path).set_duration(slide_duration)
+                    clips.append(clip)
+                except Exception as e:
+                    console.print(f"[red]Error creating clip from slide {slide_path}: {e}[/]")
+                    logger.error(f"Error creating clip from slide {slide_path}", extra={"error": str(e), "slide_path": slide_path})
+                    raise
+            
+            # Concatenate clips
+            try:
+                video = concatenate_videoclips(clips, method="compose")
+            except Exception as e:
+                console.print(f"[red]Error concatenating video clips: {e}[/]")
+                logger.error(f"Error concatenating video clips", extra={"error": str(e)})
+                raise
+            
+            # Add audio
+            try:
+                final_video = video.set_audio(audio)
+            except Exception as e:
+                console.print(f"[red]Error setting audio to video: {e}[/]")
+                logger.error(f"Error setting audio to video", extra={"error": str(e)})
+                raise
+            
+            # Write output
+            console.print(f"[cyan]Writing video to {output_path}...[/]")
+            try:
+                final_video.write_videofile(
+                    output_path,
+                    fps=self.fps,
+                    codec="libx264",
+                    audio_codec="aac",
+                    logger=None,  
+                    temp_audiofile='temp-audio.m4a',
+                    remove_temp=True
+                )
+            except Exception as e:
+                console.print(f"[red]Error writing video file: {e}[/]")
+                logger.error(f"Error writing video file", extra={"error": str(e), "output_file": output_path})
+                raise
+            
+            console.print(f"[green]✓ Video created: {output_path}[/]")
+            logger.info("Video created", extra={"output": output_path})
+            
+            # Cleanup
+            for slide_path in slides:
+                if os.path.exists(slide_path):
+                    os.remove(slide_path)
         except Exception as e:
-            console.print(f"[red]Error writing video: {e}[/]")
-            logger.error("write_videofile failed", extra={"error": str(e)})
+            console.print(f"[red]Failed to create video: {e}[/]")
+            logger.error(f"Failed to create video", extra={"error": str(e)})
             raise
         
-        console.print(f"[green]✓ Video created: {output_path}[/]")
-        logger.info("Video created", extra={"output": output_path})
-        
-        # Cleanup
-        for slide_path in slides:
-            if os.path.exists(slide_path):
-                os.remove(slide_path)
-    
     def create_shorts(self, video_path: str, output_path: str):
         """Create YouTube Shorts from video"""
         

@@ -14,7 +14,10 @@ from pathlib import Path
 from typing import Optional
 from datetime import datetime, timezone
 import shutil
+import logging
 
+# Set up logging
+logger = logging.getLogger(__name__)
 
 def _b64_data_uri(path: Path, mime: str) -> str:
     data = path.read_bytes()
@@ -130,61 +133,64 @@ def build_svg(project_dir: str | Path, metadata: dict, paragraphs: list,
     name = pdir.name
     svg_path = pdir / f"{name}.svg"
     
-    # Create version backup if SVG already exists
-    if svg_path.exists():
-        _backup_current_version(pdir, svg_path)
-
-    # Visible content: thumbnail image if present
-    width, height = 1280, 720
-    thumb_uri = None
-    if thumb_path and Path(thumb_path).exists():
-        thumb_uri = _b64_data_uri(Path(thumb_path), "image/jpeg")
-
-    # Data URIs for media
-    video_uri = None
-    if video_path and Path(video_path).exists():
-        video_uri = _b64_data_uri(Path(video_path), "video/mp4")
-    audio_uri = None
-    if audio_path and Path(audio_path).exists():
-        audio_uri = _b64_data_uri(Path(audio_path), "audio/mpeg")
-
-    # Convert date objects to strings for JSON serialization
-    date_val = metadata.get("date")
-    if hasattr(date_val, 'isoformat'):
-        date_val = date_val.isoformat()
-    elif date_val:
-        date_val = str(date_val)
-
-    meta = {
-        "name": name,
-        "title": metadata.get("title", name),
-        "date": date_val,
-        "theme": metadata.get("theme"),
-        "tags": metadata.get("tags", []),
-        "voice": metadata.get("voice"),
-        "template": metadata.get("template", "classic"),
-        "font_size": metadata.get("font_size"),
-        "lang": metadata.get("lang"),
-        "paragraphs": paragraphs,
-        "created_at": datetime.now(timezone.utc).isoformat(),
-        "media": {
-            "video_mp4": video_uri,
-            "audio_mp3": audio_uri,
-            "thumbnail_jpg": thumb_uri,
-        },
-    }
-
-    # Compose interactive SVG document with embedded video player and metadata display
-    img_tag = (
-        f"<image id=\"thumb\" href=\"{thumb_uri}\" x=\"0\" y=\"0\" width=\"{width}\" height=\"{height}\" style=\"cursor:pointer\"/>"
-        if thumb_uri else ""
-    )
-    desc = ("\n\n".join(paragraphs)).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-    meta_json = json.dumps(meta, ensure_ascii=False)
-    meta_json_esc = meta_json.replace("<", "&lt;")
+    logger.info("Building SVG", extra={"project": pdir.name, "output": str(svg_path)})
     
-    # Create interactive SVG with embedded video player and metadata display
-    svg = f"""
+    try:
+        # Create version backup if SVG already exists
+        if svg_path.exists():
+            _backup_current_version(pdir, svg_path)
+
+        # Visible content: thumbnail image if present
+        width, height = 1280, 720
+        thumb_uri = None
+        if thumb_path and Path(thumb_path).exists():
+            thumb_uri = _b64_data_uri(Path(thumb_path), "image/jpeg")
+
+        # Data URIs for media
+        video_uri = None
+        if video_path and Path(video_path).exists():
+            video_uri = _b64_data_uri(Path(video_path), "video/mp4")
+        audio_uri = None
+        if audio_path and Path(audio_path).exists():
+            audio_uri = _b64_data_uri(Path(audio_path), "audio/mpeg")
+
+        # Convert date objects to strings for JSON serialization
+        date_val = metadata.get("date")
+        if hasattr(date_val, 'isoformat'):
+            date_val = date_val.isoformat()
+        elif date_val:
+            date_val = str(date_val)
+
+        meta = {
+            "name": name,
+            "title": metadata.get("title", name),
+            "date": date_val,
+            "theme": metadata.get("theme"),
+            "tags": metadata.get("tags", []),
+            "voice": metadata.get("voice"),
+            "template": metadata.get("template", "classic"),
+            "font_size": metadata.get("font_size"),
+            "lang": metadata.get("lang"),
+            "paragraphs": paragraphs,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "media": {
+                "video_mp4": video_uri,
+                "audio_mp3": audio_uri,
+                "thumbnail_jpg": thumb_uri,
+            },
+        }
+
+        # Compose interactive SVG document with embedded video player and metadata display
+        img_tag = (
+            f"<image id=\"thumb\" href=\"{thumb_uri}\" x=\"0\" y=\"0\" width=\"{width}\" height=\"{height}\" style=\"cursor:pointer\"/>"
+            if thumb_uri else ""
+        )
+        desc = ("\n\n".join(paragraphs)).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+        meta_json = json.dumps(meta, ensure_ascii=False)
+        meta_json_esc = meta_json.replace("<", "&lt;")
+        
+        # Create interactive SVG with embedded video player and metadata display
+        svg = f"""
 <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" 
      width="{width}" height="{height}" viewBox="0 0 {width} {height}">
   <title>{metadata.get('title', name)}</title>
@@ -245,32 +251,40 @@ def build_svg(project_dir: str | Path, metadata: dict, paragraphs: list,
 </svg>
 """.strip()
 
-    # Write SVG content
-    svg_path.write_text(svg, encoding="utf-8")
-    
-    # Validate the generated SVG
-    is_valid, errors = _validate_svg(svg_path)
-    if is_valid:
-        print(f"✓ Generated valid SVG: {svg_path}")
-    else:
-        print(f"⚠ SVG validation issues in {svg_path}:")
-        for error in errors:
-            print(f"  - {error}")
+        # Write SVG content
+        svg_path.write_text(svg, encoding="utf-8")
         
-        # Attempt automatic fix for common issues
-        print("🔧 Attempting to fix common XML issues...")
-        fixed_svg = _fix_common_xml_issues(svg)
-        if fixed_svg != svg:
-            svg_path.write_text(fixed_svg, encoding="utf-8")
-            is_valid, errors = _validate_svg(svg_path)
-            if is_valid:
-                print(f"✓ Successfully fixed and validated SVG: {svg_path}")
-            else:
-                print(f"⚠ Issues remain after automatic fix:")
-                for error in errors:
-                    print(f"  - {error}")
+        # Validate the generated SVG
+        is_valid, errors = _validate_svg(svg_path)
+        if is_valid:
+            logger.info(f"✓ Generated valid SVG: {svg_path}", extra={"svg_file": str(svg_path)})
+            print(f"✓ Generated valid SVG: {svg_path}")
+        else:
+            logger.error(f"⚠ SVG validation issues in {svg_path}", extra={"project": pdir.name, "errors": errors})
+            print(f"⚠ SVG validation issues in {svg_path}:")
+            for error in errors:
+                print(f"  - {error}")
+        
+            # Attempt automatic fix for common issues
+            print("🔧 Attempting to fix common XML issues...")
+            fixed_svg = _fix_common_xml_issues(svg)
+            if fixed_svg != svg:
+                svg_path.write_text(fixed_svg, encoding="utf-8")
+                is_valid, errors = _validate_svg(svg_path)
+                if is_valid:
+                    logger.info(f"✓ Successfully fixed and validated SVG: {svg_path}", extra={"svg_file": str(svg_path)})
+                    print(f"✓ Successfully fixed and validated SVG: {svg_path}")
+                else:
+                    logger.error(f"⚠ Issues remain after automatic fix in {svg_path}", extra={"project": pdir.name, "errors": errors})
+                    print(f"⚠ Issues remain after automatic fix:")
+                    for error in errors:
+                        print(f"  - {error}")
     
-    return svg_path, is_valid, errors
+        return svg_path, is_valid, errors
+    except Exception as e:
+        logger.error(f"Error building SVG", extra={"project": pdir.name, "error": str(e)})
+        print(f"[red]Error building SVG for {pdir.name}: {e}[/]")
+        return svg_path, False, [str(e)]
 
 
 def update_svg_media(svg_path: str | Path, video_path: Optional[str] = None,

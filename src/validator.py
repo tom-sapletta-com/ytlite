@@ -11,8 +11,10 @@ from typing import Dict, List, Optional
 from rich.console import Console
 from rich.table import Table
 from datetime import datetime
+import logging
 
 console = Console()
+logger = logging.getLogger(__name__)
 
 try:
     import whisper
@@ -117,7 +119,7 @@ class VideoValidator:
         video.close()
         return frames_info
     
-    def validate_video(self, video_path: str, expected_content: Optional[str] = None) -> Dict:
+    def validate_video(self, video_path: str, expected_content: Optional[str] = None, detailed: bool = False) -> Dict:
         """Complete video validation"""
         console.print(f"[bold cyan]Validating {video_path}[/]")
         
@@ -162,9 +164,15 @@ class VideoValidator:
             if os.path.exists(audio_path):
                 os.remove(audio_path)
             
+            if detailed:
+                logger.info(f"Validated video: {video_path}", extra={"status": "Valid", "duration": properties["duration"]})
             return result
             
         except Exception as e:
+            if detailed:
+                logger.error(f"Error validating video {video_path}: {e}", extra={"error": str(e)})
+            else:
+                logger.error(f"Error validating video {video_path}", extra={"error": str(e)})
             return {
                 "status": "error",
                 "message": str(e),
@@ -224,7 +232,7 @@ class VideoValidator:
                     "C" if overall_score > 0.4 else "F"
         }
     
-    def generate_report(self, results: List[Dict], output_path: str = "output/validation_report.json"):
+    def generate_report(self, results: List[Dict], output_path: str = "output/validation_report.json", detailed: bool = False):
         """Generate comprehensive validation report"""
         report = {
             "timestamp": datetime.now().isoformat(),
@@ -245,6 +253,11 @@ class VideoValidator:
             json.dump(report, f, indent=2)
         
         console.print(f"[green]✓ Report saved to {output_path}[/]")
+        
+        if detailed:
+            logger.info("Detailed validation report saved", extra={"report_path": output_path, "results": results})
+        else:
+            logger.info("Validation report saved", extra={"report_path": output_path})
         
         # Display summary table
         self._display_summary_table(report)
@@ -328,7 +341,7 @@ class Validator:
         summary = self.summarize_report(report)
         return summary, report_path
 
-    def validate_data(self, content_path):
+    def validate_data(self, content_path, detailed: bool = False):
         """Validate the data integrity for content files."""
         results = []
         try:
@@ -367,6 +380,11 @@ class Validator:
         with open(report_path, 'w') as f:
             json.dump(report, f, indent=2)
 
+        if detailed:
+            logger.info("Detailed data validation report saved", extra={"report_path": report_path, "results": results})
+        else:
+            logger.info("Data validation report saved", extra={"report_path": report_path})
+
         summary = self.summarize_report(report)
         return summary, report_path
 
@@ -385,7 +403,7 @@ class Validator:
                 summary += "\n"
         return summary
 
-def validate_all_videos(video_dir: str = "output/videos", content_dir: str = "content/episodes"):
+def validate_all_videos(video_dir: str = "output/videos", content_dir: str = "content/episodes", detailed: bool = False):
     """Validate all videos in directory"""
     validator = VideoValidator()
     video_path = Path(video_dir)
@@ -415,11 +433,11 @@ def validate_all_videos(video_dir: str = "output/videos", content_dir: str = "co
             except:
                 pass
         
-        result = validator.validate_video(str(video_file), expected_content)
+        result = validator.validate_video(str(video_file), expected_content, detailed)
         results.append(result)
     
     # Generate report
-    report = validator.generate_report(results)
+    report = validator.generate_report(results, detailed=detailed)
     return report
 
 def main():
@@ -430,7 +448,7 @@ def main():
 
     data_summary, data_report_path = validator.validate_data('/home/tom/github/tom-sapletta-com/ytlite/content/episodes')
     print("Data Validation Summary:\n", data_summary)
-    print(f"Full report at: {data_report_path}")
+    print(f"Full report at: {data_report_path}\n")
 
 if __name__ == "__main__":
     main()
