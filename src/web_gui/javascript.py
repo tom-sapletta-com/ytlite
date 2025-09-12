@@ -4,6 +4,12 @@ JavaScript code for YTLite Web GUI
 Extracted from web_gui.py for better modularity
 """
 
+def get_javascript_content():
+    """Return the JavaScript content for the web GUI."""
+    # This function should return the JavaScript content as a string
+    # For now, return a placeholder to fix the import error
+    return "// Placeholder JavaScript content for YTLite Web GUI"
+
 JAVASCRIPT_CODE = """
 // Load existing projects on page load
 document.addEventListener('DOMContentLoaded', function() {

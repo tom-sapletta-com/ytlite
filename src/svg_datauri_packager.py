@@ -281,33 +281,59 @@ class SVGDataURIPackager:
             return False
 
 
-def create_svg_project(project_name: str, video_path: Path, audio_path: Path = None,
-                      thumbnail_path: Path = None, metadata: Dict[str, Any] = None,
-                      output_dir: Path = None) -> Path:
+def create_svg_project(project_name: str, content: str, metadata: Dict[str, Any] = None,
+                      output_path: Path = None) -> Optional[Path]:
     """Create a single SVG project file with embedded media."""
     
-    if output_dir is None:
-        output_dir = Path('output/projects')
+    from ytlite_main import YTLite
+
+    if output_path is None:
+        output_path = Path('output/svg_projects') / f"{project_name}.svg"
     
-    output_dir.mkdir(parents=True, exist_ok=True)
-    
-    # Default metadata
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
     if metadata is None:
         metadata = {}
-    
-    # Create packager and generate SVG
-    packager = SVGDataURIPackager()  
-    svg_content = packager.create_svg_project(
-        project_name, metadata, video_path, audio_path, thumbnail_path
-    )
-    
-    # Save SVG file
-    svg_file = output_dir / f"{project_name}.svg"
-    with open(svg_file, 'w', encoding='utf-8') as f:
-        f.write(svg_content)
-    
-    logger.info(f"Created SVG project: {svg_file}")
-    return svg_file
+
+    try:
+        # Use YTLite to generate the necessary files from content
+        logger.info(f"Running YTLite to generate media for {project_name}")
+        ytlite = YTLite(output_dir=str(output_path.parent.parent), project_name=project_name)
+        
+        # Create a temporary markdown file for YTLite to process
+        project_dir = output_path.parent.parent / 'projects' / project_name
+        project_dir.mkdir(parents=True, exist_ok=True)
+        md_file = project_dir / f"{project_name}.md"
+        md_file.write_text(content, encoding='utf-8')
+
+        # Generate the video and audio
+        ytlite.generate_video(str(md_file))
+        
+        # Define paths to generated files
+        video_path = project_dir / f"{project_name}.mp4"
+        audio_path = project_dir / f"{project_name}.mp3"
+        thumbnail_path = project_dir / 'thumbnail.jpg'
+
+        if not video_path.exists():
+            logger.error(f"Video file not generated for {project_name} at {video_path}")
+            return None
+
+        # Create packager and generate SVG
+        packager = SVGDataURIPackager()
+        svg_content = packager.create_svg_project(
+            project_name, metadata, video_path, audio_path, 
+            thumbnail_path if thumbnail_path.exists() else None
+        )
+        
+        # Save SVG file
+        output_path.write_text(svg_content, encoding='utf-8')
+        
+        logger.info(f"Created SVG project: {output_path}")
+        return output_path
+
+    except Exception as e:
+        logger.error(f"Failed during SVG project creation for {project_name}: {e}", exc_info=True)
+        return None
 
 
 if __name__ == "__main__":

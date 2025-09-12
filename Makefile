@@ -137,7 +137,7 @@ quick: ## Quick content from stdin (echo "content" | make quick)
 
 gui: ## Run Web GUI (Flask) on http://localhost:5000
 	@echo "$(GREEN)🚀 Starting YTLite Web GUI (Refactored Version)$(NC)"
-	@cd src && YTLITE_FAST_TEST=1 python3 ytlite_web_gui.py
+	@cd src && YTLITE_FAST_TEST=1 ../venv/bin/python ytlite_web_gui.py
 
 stop: ## Stop all running servers and processes
 	@echo "$(YELLOW)Stopping all servers and processes...$(NC)"
