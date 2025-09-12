@@ -118,6 +118,9 @@ validate-app: ## Validate application health (deps + smoke generate + project pa
 validate-data: ## Validate generated data integrity (projects folders and required files)
 	bash scripts/validate-data.sh
 
+test-data: ## Check project folders and test media/SVG files for errors, remove corrupted files
+	bash scripts/test-data.sh
+
 publish-pypi: ## Publish project to PyPI
 	@bash scripts/publish-pypi.sh
 

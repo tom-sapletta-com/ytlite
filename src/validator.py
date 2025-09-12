@@ -6,6 +6,7 @@ Tests generated videos using STT and video analysis
 
 import os
 import json
+import subprocess
 from pathlib import Path
 from typing import Dict, List, Optional
 from rich.console import Console
@@ -28,20 +29,21 @@ except ImportError:
 try:
     # MoviePy 1.x path
     from moviepy.editor import VideoFileClip
-except Exception:
+except Exception as e:
     try:
         # MoviePy 2.x path
         from moviepy import VideoFileClip
-    except Exception as e:
-        console.print("[yellow]MoviePy not found. Installing...[/]")
+    except Exception as inner_e:
+        console.print(f"[yellow]MoviePy not found. Installing...[/]")
         import subprocess
         import sys
         try:
-            subprocess.check_call([sys.executable, "-m", "pip", "install", "moviepy"])
-            from moviepy import VideoFileClip
-        except Exception as inner_e:
-            console.print(f"[bold red]MoviePy import failed after install: {inner_e}[/]")
-            raise
+            subprocess.check_call([sys.executable, "-m", "pip", "install", "moviepy==1.0.3"])
+            from moviepy.editor import VideoFileClip
+        except Exception as install_e:
+            console.print(f"[bold red]MoviePy import failed after install: {install_e}[/]")
+            logger.error(f"MoviePy import failed after install", extra={"error": str(install_e)})
+            raise Exception(f"Failed to import MoviePy: {e} (inner error: {inner_e})")
 
 class VideoValidator:
     def __init__(self):

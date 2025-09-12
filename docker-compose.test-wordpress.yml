@@ -1,0 +1,56 @@
+version: '3.8'
+
+services:
+  wordpress-test:
+    image: wordpress:6.4-apache
+    container_name: ytlite-wordpress-test
+    ports:
+      - "8080:80"
+    environment:
+      WORDPRESS_DB_HOST: mysql-test
+      WORDPRESS_DB_USER: wordpress
+      WORDPRESS_DB_PASSWORD: wordpress123
+      WORDPRESS_DB_NAME: wordpress
+      WORDPRESS_DEBUG: 1
+    volumes:
+      - wordpress_data:/var/www/html
+      - ./test-wordpress/uploads.ini:/usr/local/etc/php/conf.d/uploads.ini
+    depends_on:
+      - mysql-test
+    networks:
+      - wordpress-test-net
+
+  mysql-test:
+    image: mysql:8.0
+    container_name: ytlite-mysql-test
+    environment:
+      MYSQL_DATABASE: wordpress
+      MYSQL_USER: wordpress
+      MYSQL_PASSWORD: wordpress123
+      MYSQL_ROOT_PASSWORD: rootpass123
+    volumes:
+      - mysql_data:/var/lib/mysql
+    networks:
+      - wordpress-test-net
+
+  phpmyadmin:
+    image: phpmyadmin:5.2
+    container_name: ytlite-phpmyadmin
+    ports:
+      - "8081:80"
+    environment:
+      PMA_HOST: mysql-test
+      PMA_USER: wordpress
+      PMA_PASSWORD: wordpress123
+    depends_on:
+      - mysql-test
+    networks:
+      - wordpress-test-net
+
+volumes:
+  wordpress_data:
+  mysql_data:
+
+networks:
+  wordpress-test-net:
+    driver: bridge
