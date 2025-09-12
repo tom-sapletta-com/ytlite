@@ -57,14 +57,17 @@ def setup_routes(app: Flask, base_dir: Path, output_dir: Path):
     @app.route('/static/js/web_gui.js')
     def serve_javascript():
         """Serve the JavaScript content."""
-        from web_gui.javascript import get_javascript_content
-        return get_javascript_content(), 200, {'Content-Type': 'application/javascript'}
+        try:
+            from .javascript import get_javascript_content
+            return get_javascript_content(), 200, {'Content-Type': 'application/javascript'}
+        except ImportError:
+            logger.error("Failed to import get_javascript_content from web_gui.javascript")
+            return "// Error: JavaScript content not available", 200, {'Content-Type': 'application/javascript'}
 
     @app.route('/main.js')
     def serve_main_js():
         """Alternative route for JavaScript content."""
-        from web_gui.javascript import get_javascript_content
-        return get_javascript_content(), 200, {'Content-Type': 'application/javascript'}
+        return serve_javascript()
 
     @app.route('/files/<path:filepath>')
     def serve_files(filepath):

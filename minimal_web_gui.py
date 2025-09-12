@@ -268,6 +268,28 @@ def serve_files(filepath):
     except Exception as e:
         return f"File not found: {e}", 404
 
+@app.route('/static/js/web_gui.js')
+def serve_web_gui_js():
+    """Serve web GUI JavaScript (fallback for external JS requests)."""
+    js_content = """// YTLite Web GUI JavaScript - Fallback handler
+console.log("YTLite Web GUI JavaScript loaded successfully");
+
+// This is a fallback route - main functionality is inline in HTML
+// Added to prevent 500 errors from external JS requests
+
+function initFallbackJS() {
+    console.log("Fallback JavaScript initialized");
+}
+
+// Initialize when DOM is ready
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initFallbackJS);
+} else {
+    initFallbackJS();
+}
+"""
+    return js_content, 200, {'Content-Type': 'application/javascript'}
+
 @app.route('/favicon.ico')
 def favicon():
     return '', 204
