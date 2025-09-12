@@ -252,6 +252,74 @@ function populateEditForm(name, meta) {
   if (meta.font_size) document.getElementById('editFontSize').value = meta.font_size;
 }
 
+// Field validation
+function validateField(fieldName) {
+  const field = document.getElementById(fieldName);
+  const errorDiv = document.getElementById(fieldName + '-error');
+  const value = field.value.trim();
+  
+  let isValid = true;
+  let errorMessage = '';
+  
+  switch (fieldName) {
+    case 'project':
+      if (!value) {
+        isValid = false;
+        errorMessage = 'Project name is required';
+      } else if (!/^[a-zA-Z0-9_-]+$/.test(value)) {
+        isValid = false;
+        errorMessage = 'Project name can only contain letters, numbers, hyphens, and underscores';
+      } else if (value.length < 3) {
+        isValid = false;
+        errorMessage = 'Project name must be at least 3 characters long';
+      } else if (value.length > 50) {
+        isValid = false;
+        errorMessage = 'Project name must be less than 50 characters';
+      }
+      break;
+      
+    case 'content':
+      if (!value) {
+        isValid = false;
+        errorMessage = 'Content is required';
+      } else if (value.length < 10) {
+        isValid = false;
+        errorMessage = 'Content must be at least 10 characters long';
+      }
+      break;
+  }
+  
+  if (isValid) {
+    field.parentNode.classList.remove('error');
+    errorDiv.classList.remove('show');
+    errorDiv.textContent = '';
+  } else {
+    field.parentNode.classList.add('error');
+    errorDiv.classList.add('show');
+    errorDiv.textContent = errorMessage;
+  }
+  
+  return isValid;
+}
+
+function validateAllFields() {
+  const projectValid = validateField('project');
+  const contentValid = validateField('content');
+  
+  return projectValid && contentValid;
+}
+
+function showValidationErrors(errors) {
+  const errorsDiv = document.getElementById('validationErrors');
+  if (errors && errors.length > 0) {
+    errorsDiv.innerHTML = '<strong>Please fix these errors:</strong><ul>' + 
+      errors.map(error => `<li>${error}</li>`).join('') + '</ul>';
+    errorsDiv.style.display = 'block';
+  } else {
+    errorsDiv.style.display = 'none';
+  }
+}
+
 // Project generation
 async function generateProject() {
   const project = document.getElementById('project').value.trim();
@@ -261,9 +329,13 @@ async function generateProject() {
   const template = document.getElementById('template').value;
   const font_size = document.getElementById('font_size').value;
   
-  if (!project) { 
-    showMessage('Please enter a project name', 'error'); 
-    return; 
+  // Clear previous errors
+  showValidationErrors([]);
+  
+  // Validate all fields
+  if (!validateAllFields()) {
+    showMessage('Please fix the validation errors before generating', 'error');
+    return;
   }
   
   const formData = new FormData();
@@ -285,10 +357,64 @@ async function generateProject() {
       hideCreateForm();
       await loadProjects();
     } else {
-      showMessage(`❌ Generation failed: ${data.message}`, 'error');
+      // Check if server returned validation errors
+      if (data.validation_errors) {
+        showValidationErrors(data.validation_errors);
+      }
+      showMessage(`❌ Generation failed: ${data.message || data.error}`, 'error');
     }
   } catch (e) {
     showMessage(`❌ Generation error: ${e.message}`, 'error');
+  }
+}
+
+// Edit form validation
+function validateEditField(fieldName) {
+  const field = document.getElementById(fieldName);
+  const errorDiv = document.getElementById(fieldName + '-error');
+  const value = field.value.trim();
+  
+  let isValid = true;
+  let errorMessage = '';
+  
+  switch (fieldName) {
+    case 'editContent':
+      if (!value) {
+        isValid = false;
+        errorMessage = 'Content is required';
+      } else if (value.length < 10) {
+        isValid = false;
+        errorMessage = 'Content must be at least 10 characters long';
+      }
+      break;
+  }
+  
+  if (isValid) {
+    field.parentNode.classList.remove('error');
+    errorDiv.classList.remove('show');
+    errorDiv.textContent = '';
+  } else {
+    field.parentNode.classList.add('error');
+    errorDiv.classList.add('show');
+    errorDiv.textContent = errorMessage;
+  }
+  
+  return isValid;
+}
+
+function validateEditForm() {
+  const contentValid = validateEditField('editContent');
+  return contentValid;
+}
+
+function showEditValidationErrors(errors) {
+  const errorsDiv = document.getElementById('editValidationErrors');
+  if (errors && errors.length > 0) {
+    errorsDiv.innerHTML = '<strong>Please fix these errors:</strong><ul>' + 
+      errors.map(error => `<li>${error}</li>`).join('') + '</ul>';
+    errorsDiv.style.display = 'block';
+  } else {
+    errorsDiv.style.display = 'none';
   }
 }
 
@@ -301,6 +427,15 @@ async function updateProject() {
   const font_size = document.getElementById('editFontSize').value;
   
   if (!project) return;
+  
+  // Clear previous errors
+  showEditValidationErrors([]);
+  
+  // Validate edit form
+  if (!validateEditForm()) {
+    showMessage('Please fix the validation errors before updating', 'error');
+    return;
+  }
   
   const formData = new FormData();
   formData.append('project', project);
@@ -321,7 +456,11 @@ async function updateProject() {
       hideEditForm();
       await loadProjects();
     } else {
-      showMessage(`❌ Update failed: ${data.message}`, 'error');
+      // Check if server returned validation errors
+      if (data.validation_errors) {
+        showEditValidationErrors(data.validation_errors);
+      }
+      showMessage(`❌ Update failed: ${data.message || data.error}`, 'error');
     }
   } catch (e) {
     showMessage(`❌ Update error: ${e.message}`, 'error');

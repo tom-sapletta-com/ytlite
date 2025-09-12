@@ -250,6 +250,38 @@ INDEX_HTML = """
       background: #fff3cd;
       color: #856404;
     }
+
+    .validation-errors {
+      background: #f8d7da;
+      color: #721c24;
+      border: 1px solid #f5c6cb;
+      border-radius: 6px;
+      padding: 12px;
+      margin-bottom: 16px;
+    }
+
+    .field-error {
+      color: #dc3545;
+      font-size: 12px;
+      margin-top: 4px;
+      margin-bottom: 8px;
+      display: none;
+    }
+
+    .field-error.show {
+      display: block;
+    }
+
+    .form-field.error input,
+    .form-field.error textarea {
+      border-color: #dc3545;
+      background-color: rgba(220, 53, 69, 0.1);
+    }
+
+    .validation-warning {
+      background: #fff3cd;
+      color: #856404;
+    }
     
     .project-card { 
       border: 1px solid var(--border-color); 
@@ -413,16 +445,30 @@ INDEX_HTML = """
     <button onclick="showCreateForm()" class="btn btn-primary">+ New Project</button>
     
     <div id="createForm">
+      <div id="validationErrors" class="validation-errors" style="display: none;"></div>
+      
       <label for="project">Project Name:</label>
-      <input type="text" id="project" name="project" placeholder="my-awesome-project">
+      <input type="text" id="project" name="project" placeholder="my-awesome-project" onblur="validateField('project')">
+      <div id="project-error" class="field-error"></div>
       
       <label for="content">Content (Markdown):</label>
-      <textarea id="content" name="content" placeholder="# My Title
+      <textarea id="content" name="content" placeholder="title: My Title
+date: 2025-01-15
+theme: wetware
+tags: ['example', 'demo']
+
+# My Title
 
 This is my content with **markdown** support.
 
 - Point 1
-- Point 2"></textarea>
+- Point 2
+
+## Features
+- Markdown formatting
+- YAML frontmatter
+- Multiple themes" onblur="validateField('content')"></textarea>
+      <div id="content-error" class="field-error"></div>
       
       <div class="row">
         <div class="col">
@@ -503,11 +549,14 @@ This is my content with **markdown** support.
 
   <div id="editForm" class="box">
     <h2>✏️ Edit Project</h2>
+    <div id="editValidationErrors" class="validation-errors" style="display: none;"></div>
+    
     <label for="editProject">Project Name:</label>
     <input type="text" id="editProject" name="editProject" readonly>
     
     <label for="editContent">Content (Markdown):</label>
-    <textarea id="editContent" name="editContent"></textarea>
+    <textarea id="editContent" name="editContent" onblur="validateEditField('editContent')"></textarea>
+    <div id="editContent-error" class="field-error"></div>
     
     <div class="row">
       <div class="col">

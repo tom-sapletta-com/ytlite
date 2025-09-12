@@ -296,7 +296,7 @@ def create_svg_project(project_name: str, video_path: Path, audio_path: Path = N
         metadata = {}
     
     # Create packager and generate SVG
-    packager = SVGDataURIPackager()
+    packager = SVGDataURIPackager()  
     svg_content = packager.create_svg_project(
         project_name, metadata, video_path, audio_path, thumbnail_path
     )

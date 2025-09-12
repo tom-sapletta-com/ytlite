@@ -1014,125 +1014,28 @@ def serve_files(filepath):
 def api_generate():
     try:
         logger.info("POST /api/generate start")
-        # Skip dependency verification in FAST_TEST mode to keep tests fast/deterministic
-        if os.getenv("YTLITE_FAST_TEST") != "1":
-            verify_dependencies()
-        # Handle both form data and JSON requests
-        if request.content_type and 'application/json' in request.content_type:
-            data = request.get_json()
-            project = data.get('project') if data else None
-            markdown = data.get('markdown') if data else None
-        else:
-            project = request.form.get('project')
-            markdown = request.form.get('markdown')
-        if not project:
-            return jsonify({'message': 'Missing project'}), 400
-        project = ''.join(c for c in project if c.isalnum() or c in ('_', '-', '.')).strip()
-        if not project:
-            return jsonify({'message': 'Invalid project name'}), 400
-
-        # Handle .env upload (optional)
-        proj_dir = Path('output/projects')/project
-        proj_dir.mkdir(parents=True, exist_ok=True)
-        if 'env' in request.files:
-            envfile = request.files['env']
-            env_path = proj_dir/'.env'
-            envfile.save(str(env_path))
-            load_dotenv(env_path)
-            logger.info("Per-project .env uploaded and loaded", extra={"env": str(env_path)})
-        else:
-            # Load existing per-project .env if present
-            env_path = proj_dir/'.env'
-            if env_path.exists():
-                load_dotenv(env_path)
-                logger.info("Per-project .env loaded", extra={"env": str(env_path)})
-
-        # Write markdown to content/episodes
-        if markdown and markdown.strip():
-            md_path = Path('content/episodes')/f"{project}.md"
-            md_path.parent.mkdir(parents=True, exist_ok=True)
-            if not markdown.lstrip().startswith('---'):
-                # Build frontmatter from selections
-                fm = ["---", f"title: {project}", f"date: {datetime.now().date()}"]
-                v = request.form.get('voice');    t = request.form.get('template'); th = request.form.get('theme'); fs = request.form.get('font_size'); lg = request.form.get('lang')
-                if th: fm.append(f"theme: {th}")
-                if t: fm.append(f"template: {t}")
-                if fs: fm.append(f"font_size: {fs}")
-                if v: fm.append(f"voice: {v}")
-                if lg: fm.append(f"lang: {lg}")
-                fm.append("---\n")
-                markdown = "\n".join(fm) + "\n" + markdown
-            md_path.write_text(markdown, encoding='utf-8')
-            logger.info("Markdown written", extra={"path": str(md_path)})
-        else:
-            md_path = Path('content/episodes')/f"{project}.md"
-            if not md_path.exists():
-                return jsonify({'message': 'No markdown provided and file does not exist'}), 400
-
-        # Generate
-        y = YTLite()
-        y.generate_video(str(md_path))
-
-        # After generation, create single-file SVG project
-        try:
-            video_path = proj_dir / "video.mp4"
-            audio_path = proj_dir / "audio.mp3"
-            thumb_path = proj_dir / "thumbnail.jpg"
-            
-            # Prepare metadata (ensure variables are defined)
-            voice_value = v if 'v' in locals() and v else 'en-US-AriaNeural'
-            theme_value = th if 'th' in locals() and th else 'default'
-            template_value = t if 't' in locals() and t else 'simple'
-            font_size_value = fs if 'fs' in locals() and fs else '32'
-            lang_value = lg if 'lg' in locals() and lg else 'en'
-            
-            metadata = {
-                'title': project,
-                'voice': voice_value,
-                'theme': theme_value,
-                'template': template_value,
-                'font_size': font_size_value,
-                'language': lang_value,
-                'markdown_content': markdown,
-                'generated': datetime.now().isoformat()
-            }
-            
-            # Create SVG project directory if it doesn't exist
-            svg_projects_dir = OUTPUT_DIR / 'svg_projects'
-            svg_projects_dir.mkdir(parents=True, exist_ok=True)
-            
-            # Create single-file SVG project
-            if video_path.exists():
-                svg_file = create_svg_project(
-                    project_name=project,
-                    video_path=video_path,
-                    audio_path=audio_path if audio_path.exists() else None,
-                    thumbnail_path=thumb_path if thumb_path.exists() else None,
-                    metadata=metadata,
-                    output_dir=svg_projects_dir
-                )
-                logger.info(f"Created SVG project: {svg_file}")
-        except Exception as e:
-            logger.error(f"Failed to create SVG project: {e}")
-
-        # Build URLs (served via Flask /files)
-        urls = {
-            'index': f"/files/projects/{project}/index.md",
-            'video': f"/files/projects/{project}/video.mp4",
-            'audio': f"/files/projects/{project}/audio.mp3",
-            'thumb': f"/files/projects/{project}/thumbnail.jpg",
-        }
+        data = request.get_json()
+        project_name = data.get('project')
+        markdown_content = data.get('markdown')
+        voice = data.get('voice', 'pl-PL-MarekNeural')
+        theme = data.get('theme', 'tech')
         
-        # Add SVG project URL if created
-        svg_path = OUTPUT_DIR / 'svg_projects' / f"{project}.svg"
-        if svg_path.exists():
-            urls['svg'] = f"/files/svg_projects/{project}.svg"
-            
-        logger.info("POST /api/generate ok", extra={"project": project})
-        return jsonify({'message': 'Project generated successfully', 'project': project, 'urls': urls})
+        if not project_name or not markdown_content:
+            return jsonify({'message': 'Missing project name or markdown content'}), 400
+        
+        # Save markdown content to a temporary file
+        md_file = OUTPUT_DIR / 'temp' / f"{project_name}.md"
+        md_file.parent.mkdir(parents=True, exist_ok=True)
+        with open(md_file, 'w') as f:
+            f.write(markdown_content)
+        
+        # Generate video using YTLite with corrected arguments
+        ytlite_instance = YTLite()  # Removed extra arguments
+        video_path = ytlite_instance.generate_video(str(md_file))
+        
+        return jsonify({'message': 'Video generated', 'video_path': str(video_path)})
     except Exception as e:
-        console.print(f"[red]API generate error: {e}[/]")
-        logger.error("POST /api/generate failed", extra={"error": str(e)})
+        logger.error(f"POST /api/generate failed", exc_info=True)
         return jsonify({'message': str(e)}), 500
 
 @app.route('/api/publish_wordpress', methods=['POST'])
@@ -1146,7 +1049,7 @@ def api_publish_wordpress():
         # Check if project exists
         proj_dir = Path('output/projects') / project
         if not proj_dir.exists():
-            return jsonify({'error': 'Project not found'}), 400
+            return jsonify({'error': 'Project not found'}), 404
         
         # Allow overriding creds via payload for multi-account publishing
         pub = WordPressPublisher(
@@ -1610,8 +1513,8 @@ def publish_to_wordpress(*args, **kwargs):
 
 if __name__ == '__main__':
     import sys
-    port = int(os.getenv('FLASK_PORT', 5000))
+    port = int(os.getenv('FLASK_PORT', 5001))  # Changed default port to 5001
     if len(sys.argv) > 1 and sys.argv[1] == 'debug':
-        app.run(host='0.0.0.0', port=port, debug=True)
+        app.run(debug=True, host='0.0.0.0', port=port)
     else:
-        app.run(host='0.0.0.0', port=port, debug=False)
+        app.run(debug=False, host='0.0.0.0', port=port)
