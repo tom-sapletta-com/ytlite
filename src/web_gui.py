@@ -1116,8 +1116,10 @@ def api_project_history():
         return jsonify({'error': 'Missing project name'}), 400
     
     project_dir = OUTPUT_DIR / 'projects' / project
+    if not project_dir.exists():
+        return jsonify({'error': 'Project not found'}), 404
+        
     versions_dir = project_dir / 'versions'
-    
     versions = []
     
     # Add current version
