@@ -6,16 +6,10 @@ Extracted from web_gui.py for better modularity
 
 def get_javascript_content():
     """Return the JavaScript content for the web GUI."""
-    # This function should return the JavaScript content as a string
-    # For now, return a placeholder to fix the import error
     return """
-// Load existing projects on page load
 (function() {
-  (function() {
-  (function() {
-  (function() {
-  (function() {
-  (function() {
+  "use strict";
+
   document.addEventListener('DOMContentLoaded', function() {
     loadTheme();
     loadProjects();
@@ -827,6 +821,8 @@ function showMessage(text, type = 'info') {
   window.switchProjectView = switchProjectView;
   window.showCreateForm = showCreateForm;
   window.hideCreateForm = hideCreateForm;
+  window.showEditForm = showEditForm;
+  window.hideEditForm = hideEditForm;
   window.generateProject = generateProject;
   window.editSVGProject = editSVGProject;
   window.editProject = editProject;
