@@ -92,28 +92,28 @@ class TestProjectDeletion:
             f.write("test")
 
         response = client.post('/api/delete_project', json={"project": project_name})
-        assert response.status_code == 200  
+        self.assertEqual(response.status_code, 200)  
         data = response.get_json()
-        assert not data.get('success', False)  
-        assert 'error' in data  
-        assert os.path.exists(project_dir), "Project directory should not be deleted without confirmation"
+        self.assertFalse(data.get('success', False))  
+        self.assertIn('error', data)  
+        self.assertTrue(os.path.exists(project_dir), "Project directory should not be deleted without confirmation")
 
     def test_delete_nonexistent_project(self, client):
         """Test deleting a project that does not exist."""
         response = client.post('/api/delete_project', json={"project": "nonexistent", "confirm": True})
-        assert response.status_code == 200  
+        self.assertEqual(response.status_code, 200)  
         data = response.get_json()
-        assert not data.get('success', False)  
-        assert 'error' in data  
+        self.assertFalse(data.get('success', False))  
+        self.assertIn('error', data)  
 
     def test_delete_project_security_check(self, client):
         """Test security check for project deletion (prevent path traversal)."""
         response = client.post('/api/delete_project', json={"project": "../malicious/path", "confirm": True})
-        assert response.status_code == 200  
+        self.assertEqual(response.status_code, 200)  
         data = response.get_json()
-        assert not data.get('success', False)  
-        assert 'error' in data  
-        assert 'invalid project name' in data['error'].lower(), "Should prevent path traversal attacks"
+        self.assertFalse(data.get('success', False))  
+        self.assertIn('error', data)  
+        self.assertIn('invalid project name', data['error'].lower(), "Should prevent path traversal attacks")
     
     def test_delete_project_with_special_characters(self, client):
         """Test deletion with special characters in project name."""
