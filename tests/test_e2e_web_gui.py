@@ -9,8 +9,11 @@ SRC = ROOT / "src"
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
-import web_gui  # type: ignore
-app = web_gui.app
+# Import the Flask app from the correct location
+from src.ytlite_web_gui import create_production_app
+
+# Create the app instance for testing
+app = create_production_app()
 
 
 def _client():

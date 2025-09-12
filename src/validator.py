@@ -61,15 +61,35 @@ class VideoValidator:
         return self.whisper_model
     
     def extract_audio_from_video(self, video_path: str) -> str:
-        """Extract audio from video for STT analysis"""
-        video = VideoFileClip(video_path)
-        audio_path = f"/tmp/extracted_audio_{Path(video_path).stem}.wav"
+        """Extract audio from video file using ffmpeg."""
         try:
-            video.audio.write_audiofile(audio_path, verbose=False, logger=None)
-        except TypeError:
-            video.audio.write_audiofile(audio_path, logger=None)
-        video.close()
-        return audio_path
+            temp_audio_path = "/tmp/extracted_audio_{}.wav".format(os.path.basename(video_path).replace(".mp4", ""))
+            if os.path.exists(temp_audio_path):
+                os.remove(temp_audio_path)
+            
+            command = [
+                "ffmpeg",
+                "-i", str(video_path),
+                "-vn",  # no video
+                "-acodec", "pcm_s16le",  # audio codec
+                "-ar", "16000",  # audio sampling rate
+                "-ac", "1",  # mono channel
+                str(temp_audio_path)
+            ]
+            result = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+            if result.returncode != 0:
+                logger.error(f"FFmpeg error extracting audio from {video_path}: {result.stderr}")
+                print(f"Error extracting audio from video {video_path}. FFmpeg output: {result.stderr}")
+                return None
+            if not os.path.exists(temp_audio_path):
+                logger.error(f"Audio file not created for {video_path}")
+                print(f"Error extracting audio from video {video_path}. Audio file not created.")
+                return None
+            return temp_audio_path
+        except Exception as e:
+            logger.error(f"Exception extracting audio from {video_path}: {e}")
+            print(f"Error extracting audio from video {video_path}. Exception: {e}")
+            return None
     
     def transcribe_audio(self, audio_path: str) -> Dict:
         """Transcribe audio using Whisper STT"""

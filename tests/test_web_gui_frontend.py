@@ -275,16 +275,18 @@ This is a frontend test project to verify form functionality.
     def test_projects_list_loads(self, driver, web_server):
         """Test that projects list loads correctly."""
         driver.get(web_server)
-        
-        # Wait for projects to load
-        projects_container = WebDriverWait(driver, 10).until(
+
+        # Wait for projects to load with increased timeout
+        projects_container = WebDriverWait(driver, 30).until(
             EC.presence_of_element_located((By.ID, "projectsList"))
         )
-        
-        # Should show either projects or "No projects found" message
-        content = projects_container.text
-        assert content is not None
-        assert len(content) > 0
+        assert projects_container is not None, "Projects container not found on page"
+
+        # Check if at least one project card is present
+        project_cards = WebDriverWait(driver, 30).until(
+            EC.presence_of_all_elements_located((By.CLASS_NAME, "project-card"))
+        )
+        assert len(project_cards) > 0, "No project cards loaded"
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
