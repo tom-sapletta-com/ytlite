@@ -16,6 +16,9 @@ from rich.console import Console
 
 console = Console()
 
+# Import routes from web_gui module at module level
+from web_gui.routes import *
+
 def create_production_app():
     """Create the production-ready Flask application."""
     app = Flask(__name__)
@@ -35,7 +38,6 @@ def create_production_app():
     
     # Import and setup all routes
     try:
-        from web_gui.routes import *
         setup_routes(app, base_dir, output_dir)
         
         route_count = len(list(app.url_map.iter_rules()))
@@ -61,7 +63,7 @@ def create_production_app():
         from web_gui.javascript import serve_js as serve_javascript_unique
         app.route('/static/js/<path:path>')(serve_javascript_unique)
     except ImportError:
-        logger.warning("JavaScript serving route not available")
+        console.print("[yellow]⚠️ JavaScript serving route not available[/yellow]")
         # Fallback to static serving if module not found
         @app.route('/static/js/<path:path>')
         def serve_static_js(path):
