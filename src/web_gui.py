@@ -1073,22 +1073,22 @@ def api_generate():
 def api_publish_wordpress():
     try:
         data = request.get_json(silent=True) or {}
-        project = data.get('project')
-        status = data.get('status', 'draft')
+        project = data.get('project', '').strip()
         if not project:
-            return jsonify({'message': 'Missing project'}), 400
-        proj_dir = Path('output/projects')/project
-        env_path = proj_dir/'.env'
-        if env_path.exists():
-            load_dotenv(env_path)
-        logger.info("POST /api/publish_wordpress", extra={"project": project, "status": status})
+            return jsonify({'error': 'Missing project name'}), 400
+        
+        # Check if project exists
+        proj_dir = Path('output/projects') / project
+        if not proj_dir.exists():
+            return jsonify({'error': 'Project not found'}), 400
+        
         # Allow overriding creds via payload for multi-account publishing
         pub = WordPressPublisher(
             base_url=data.get('base_url'),
             username=data.get('username'),
             app_password=data.get('app_password'),
         )
-        result = pub.publish_project(str(proj_dir), publish_status=status)
+        result = pub.publish_project(str(proj_dir), publish_status=data.get('status', 'draft'))
         if not result:
             logger.error("Publish failed", extra={"project": project})
             return jsonify({'message': 'Publish failed'}), 500
