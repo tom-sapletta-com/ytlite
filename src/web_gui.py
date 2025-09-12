@@ -29,6 +29,7 @@ from storage_nextcloud import NextcloudClient
 from logging_setup import get_logger
 from progress import load_progress
 from svg_packager import parse_svg_meta, update_svg_media
+from svg_datauri_packager import SVGDataURIPackager, create_svg_project
 
 console = Console()
 app = Flask(__name__)
@@ -860,10 +861,19 @@ def favicon():
 def serve_file(filepath):
     """Serve files from output directory with proper MIME types for video"""
     try:
+        # Normalize path to prevent directory traversal
+        norm_path = os.path.normpath(filepath)
+        if '..' in norm_path or norm_path.startswith('/'):
+            return jsonify({'error': 'Invalid path'}), 404
+            
+        full_path = os.path.join(OUTPUT_DIR, norm_path)
+        # Ensure path is within OUTPUT_DIR
+        if not os.path.realpath(full_path).startswith(os.path.realpath(OUTPUT_DIR)):
+            return jsonify({'error': 'Access denied'}), 404
         from flask import Response
         import mimetypes
         
-        file_path = OUTPUT_DIR / filepath
+        file_path = full_path
         if not file_path.exists():
             return f"File not found: {filepath}", 404
         
@@ -961,6 +971,42 @@ def api_generate():
         y = YTLite()
         y.generate_video(str(md_path))
 
+        # After generation, create single-file SVG project
+        try:
+            video_path = proj_dir / "video.mp4"
+            audio_path = proj_dir / "audio.mp3"
+            thumb_path = proj_dir / "thumbnail.jpg"
+            
+            # Prepare metadata
+            metadata = {
+                'title': project,
+                'voice': v or 'en-US-AriaNeural',
+                'theme': th or 'default',
+                'template': t or 'simple',
+                'font_size': fs or '32',
+                'language': lg or 'en',
+                'markdown_content': markdown,
+                'generated': datetime.now().isoformat()
+            }
+            
+            # Create SVG project directory if it doesn't exist
+            svg_projects_dir = OUTPUT_DIR / 'svg_projects'
+            svg_projects_dir.mkdir(parents=True, exist_ok=True)
+            
+            # Create single-file SVG project
+            if video_path.exists():
+                svg_file = create_svg_project(
+                    project_name=project,
+                    video_path=video_path,
+                    audio_path=audio_path if audio_path.exists() else None,
+                    thumbnail_path=thumb_path if thumb_path.exists() else None,
+                    metadata=metadata,
+                    output_dir=svg_projects_dir
+                )
+                logger.info(f"Created SVG project: {svg_file}")
+        except Exception as e:
+            logger.error(f"Failed to create SVG project: {e}")
+
         # Build URLs (served via Flask /files)
         urls = {
             'index': f"/files/projects/{project}/index.md",
@@ -968,6 +1014,12 @@ def api_generate():
             'audio': f"/files/projects/{project}/audio.mp3",
             'thumb': f"/files/projects/{project}/thumbnail.jpg",
         }
+        
+        # Add SVG project URL if created
+        svg_path = OUTPUT_DIR / 'svg_projects' / f"{project}.svg"
+        if svg_path.exists():
+            urls['svg'] = f"/files/svg_projects/{project}.svg"
+            
         logger.info("POST /api/generate ok", extra={"project": project})
         return jsonify({'project': project, 'urls': urls})
     except Exception as e:
@@ -1043,32 +1095,70 @@ def api_progress():
 
 @app.route('/api/projects')
 def api_projects():
-    root = OUTPUT_DIR / 'projects'
+    """List all projects including both directory-based and SVG-based projects."""
     items = []
-    for p in sorted(root.glob('*/')):
-        name = p.name
-        svg = next(p.glob('*.svg'), None)
+    
+    # Directory-based projects (legacy)
+    projects_root = OUTPUT_DIR / 'projects'
+    if projects_root.exists():
+        for p in sorted(projects_root.glob('*/')):
+            name = p.name
+            svg = next(p.glob('*.svg'), None)
+            
+            # Check for version history
+            versions_dir = p / 'versions'
+            version_count = len(list(versions_dir.glob('*.svg'))) if versions_dir.exists() else 0
+            
+            # Validate current SVG
+            svg_valid = False
+            if svg:
+                try:
+                    import subprocess
+                    result = subprocess.run(['xmllint', '--noout', str(svg)], capture_output=True)
+                    svg_valid = result.returncode == 0
+                except:
+                    svg_valid = False
+            
+            items.append({
+                'name': name,
+                'type': 'directory',
+                'svg': svg.name if svg else None,
+                'versions': version_count + 1 if svg else 0,
+                'svg_valid': svg_valid
+            })
+    
+    # Single-file SVG projects (new approach)
+    svg_root = OUTPUT_DIR / 'svg_projects'
+    if svg_root.exists():
+        svg_root.mkdir(parents=True, exist_ok=True)
         
-        # Check for version history
-        versions_dir = p / 'versions'
-        version_count = len(list(versions_dir.glob('*.svg'))) if versions_dir.exists() else 0
-        
-        # Validate current SVG
-        svg_valid = False
-        if svg:
+        for svg_file in sorted(svg_root.glob('*.svg')):
+            name = svg_file.stem
+            
+            # Extract metadata from SVG
             try:
-                import subprocess
-                result = subprocess.run(['xmllint', '--noout', str(svg)], capture_output=True)
-                svg_valid = result.returncode == 0
-            except:
-                svg_valid = False
-        
-        items.append({
-            'name': name,
-            'svg': svg.name if svg else None,
-            'versions': version_count + 1 if svg else 0,  # +1 for current version
-            'svg_valid': svg_valid
-        })
+                packager = SVGDataURIPackager()
+                metadata = packager.extract_metadata(svg_file)
+                
+                items.append({
+                    'name': name,
+                    'type': 'svg',
+                    'svg': svg_file.name,
+                    'svg_valid': True,  # Assume valid if we can read metadata
+                    'metadata': metadata,
+                    'title': metadata.get('title', name),
+                    'created': metadata.get('created'),
+                    'modified': metadata.get('modified')
+                })
+            except Exception as e:
+                logger.error(f"Failed to read SVG project {svg_file}: {e}")
+                items.append({
+                    'name': name,
+                    'type': 'svg',
+                    'svg': svg_file.name,
+                    'svg_valid': False
+                })
+    
     return jsonify({'projects': items})
 
 @app.route('/api/validate_svg')
@@ -1226,19 +1316,22 @@ def api_delete_project():
         confirm = data.get('confirm', False)
         
         if not project:
-            return jsonify({'message': 'Missing project name'}), 400
+            return jsonify({'error': 'Missing project name'}), 400
+            
+        if '..' in project or '/' in project or '\\' in project:
+            return jsonify({'error': 'Invalid project name'}), 400
             
         if not confirm:
-            return jsonify({'message': 'Confirmation required for deletion'}), 400
+            return jsonify({'error': 'Confirmation required'}), 400
         
         project_dir = OUTPUT_DIR / 'projects' / project
         
         if not project_dir.exists():
-            return jsonify({'message': 'Project not found'}), 404
+            return jsonify({'error': 'Project not found'}), 404
         
         # Security check: ensure we're only deleting within projects directory
         if not str(project_dir.resolve()).startswith(str((OUTPUT_DIR / 'projects').resolve())):
-            return jsonify({'message': 'Invalid project path'}), 400
+            return jsonify({'error': 'Invalid project path'}), 400
         
         # Delete the entire project directory
         import shutil

@@ -81,11 +81,12 @@ make preview  # http://localhost:8080
 ## Features
 
 ### 🎬 Content Creation
-- **Markdown to Video**: Transform markdown content into engaging multimedia presentations
+- **Single-File SVG Projects**: Each project stored as one SVG file with embedded metadata and media
+- **DataURI Media Embedding**: MP4, MP3, WAV files embedded directly in SVG using data URIs
+- **Interactive SVG Files**: SVG files playable in browsers with video controls and metadata display
+- **Thumbnail Integration**: SVG serves as both project container and video thumbnail
 - **Multi-language Support**: Generate content in multiple languages with locale-specific voices
 - **Voice Synthesis**: High-quality text-to-speech using Azure Cognitive Services with 200+ voices
-- **Video Generation**: Automated video creation with customizable themes and templates
-- **Interactive SVG Packaging**: Self-contained SVG files with embedded video/audio content
 
 ### 🔧 Advanced Validation & Management
 - **XML Validation**: Comprehensive SVG validation with automatic error fixing
@@ -94,9 +95,10 @@ make preview  # http://localhost:8080
 - **Batch Operations**: Bulk validation and processing of multiple projects
 
 ### 🌐 Integrations & Publishing
-- **WordPress Integration**: Direct publishing to WordPress sites with custom fields
-- **Nextcloud Integration**: Content synchronization and remote storage
-- **Web GUI**: Modern, responsive web interface with day/night themes
+- **WordPress Integration**: Direct publishing to WordPress sites with embedded SVG media
+- **Docker WordPress**: Containerized WordPress environment for testing and development
+- **Nextcloud Integration**: Content synchronization and remote storage for SVG projects
+- **Web GUI**: Modern, responsive web interface with SVG project browser
 - **REST API**: Complete programmatic access to all functionality
 
 ### 🛡️ Security & Performance
