@@ -245,7 +245,16 @@ async function editSVGProject(name) {
 
 function populateEditForm(name, meta) {
   document.getElementById('editProject').value = name;
-  document.getElementById('editContent').value = meta.markdown_content || meta.markdown || '';
+  
+  // Try multiple possible field names for content
+  const content = meta.markdown_content || meta.markdown || meta.content || meta.description || '';
+  document.getElementById('editContent').value = content;
+  
+  // Debug logging to help identify missing content
+  if (!content) {
+    console.warn('No content found for project', name, 'Available meta fields:', Object.keys(meta));
+  }
+  
   if (meta.voice) document.getElementById('editVoice').value = meta.voice;
   if (meta.theme) document.getElementById('editTheme').value = meta.theme;
   if (meta.template) document.getElementById('editTemplate').value = meta.template;
