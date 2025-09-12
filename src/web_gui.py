@@ -561,7 +561,7 @@ async function loadProjects() {
               '<a href="/files/projects/' + project.name + '/" target="_blank" class="btn">📂 Files</a>' +
               '<button onclick="editProject(\\\'' + project.name + '\\\')" class="btn">✏️ Edit</button>' +
               (project.versions && project.versions > 1 ? '<button onclick="showVersionHistory(\\\'' + project.name + '\\\')" class="btn">📜 History</button>' : '') +
-              '<button onclick="deleteProject(\\\'' + project.name + '\\\')" class="btn btn-danger" style="margin-left: 8px;">🗑️ Delete</button>' +
+              '<button onclick="deleteProject(\\\'' + project.name + '\\\', event)" class="btn btn-danger" style="margin-left: 8px;">🗑️ Delete</button>' +
             '</div>' +
           '</div>';
         }).join('') + '</div>';
@@ -729,32 +729,6 @@ async function showVersionHistory(projectName) {
     }
   } catch (e) {
     console.error('Failed to load version history:', e);
-    alert('Failed to load version history.');
-  }
-}
-
-async function restoreVersion(projectName, version) {
-  if (!confirm(`Restore ${projectName} to version ${version}? This will create a new version.`)) return;
-  
-  try {
-    const res = await fetch('/api/restore_version', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ project: projectName, version: version })
-    });
-    
-    const result = await res.json();
-    if (res.ok) {
-      alert('Version restored successfully!');
-      document.getElementById('versionModal').style.display = 'none';
-      await loadProjects();
-    } else {
-      alert('Failed to restore version: ' + (result.message || 'Unknown error'));
-    }
-  } catch (e) {
-    console.error('Failed to restore version:', e);
-    alert('Failed to restore version.');
-  }
 }
 
 async function publishWP() {
@@ -782,6 +756,52 @@ async function fetchNC() {
   const data = await res.json();
   if (!res.ok) { alert('Error: '+(data.message||res.status)); return; }
   alert('Pobrano do: '+data.local_path);
+}
+
+async function deleteProject(projectName, event) {
+  // Prevent event bubbling to avoid triggering selectProject
+  if (event) {
+    event.stopPropagation();
+  }
+  
+  const confirmMessage = `⚠️ WARNING: This will permanently delete the project "${projectName}" and ALL its files, including:
+  
+• SVG files
+• Version history  
+• Generated content
+• Configuration files
+
+This action CANNOT be undone.
+
+Type the project name to confirm deletion:`;
+  
+  const userInput = prompt(confirmMessage);
+  
+  if (userInput !== projectName) {
+    if (userInput !== null) {  // User didn't cancel
+      alert('Project name does not match. Deletion cancelled.');
+    }
+    return;
+  }
+  
+  try {
+    const response = await fetch('/api/delete_project', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({project: projectName, confirm: true})
+    });
+    
+    const data = await response.json();
+    
+    if (response.ok) {
+      alert('✅ ' + data.message);
+      await loadProjects();
+    } else {
+      alert('❌ Error: ' + data.message);
+    }
+  } catch (e) {
+    alert('❌ Failed to delete project: ' + e.message);
+  }
 }
 </script>
 </body>

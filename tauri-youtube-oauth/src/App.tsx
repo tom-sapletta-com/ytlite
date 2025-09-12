@@ -254,7 +254,7 @@ export default function App() {
           <label>
             Wybierz głos:
             <select value={selectedVoice} onChange={handleVoiceChange}>
-              {Object.entries(voices).map(([id, details]) => (
+              {voices && Object.entries(voices).map(([id, details]) => (
                 <option key={id} value={id}>{details.description}</option>
               ))}
             </select>
@@ -262,7 +262,7 @@ export default function App() {
           <label>
             Wybierz szablon:
             <select value={selectedTemplate} onChange={handleTemplateChange}>
-              {Object.entries(templates).map(([id, details]) => (
+              {templates && Object.entries(templates).map(([id, details]) => (
                 <option key={id} value={id}>{details.name} - {details.description}</option>
               ))}
             </select>
