@@ -18,7 +18,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
-from flask import Flask, request, jsonify, send_from_directory, render_template_string
+from flask import Flask, request, jsonify, send_from_directory, render_template_string, send_file
 from dotenv import load_dotenv
 from rich.console import Console
 
@@ -1589,6 +1589,15 @@ def api_svg_update():
         new_txt = txt[:m.start(1)] + new_json + txt[m.end(1):]
         svg.write_text(new_txt, encoding='utf-8')
     return jsonify({'ok': True, 'svg': svg.name})
+
+@app.route('/api/project/<project_name>/thumbnail')
+def get_project_thumbnail(project_name):
+    """Get thumbnail for a project"""
+    thumbnail_path = os.path.join('output', 'projects', project_name, 'thumbnail.jpg')
+    if os.path.exists(thumbnail_path):
+        return send_file(thumbnail_path, mimetype='image/jpeg')
+    else:
+        return jsonify({'error': 'Thumbnail not found'}), 404
 
 # Test compatibility functions
 def generate_project(*args, **kwargs):

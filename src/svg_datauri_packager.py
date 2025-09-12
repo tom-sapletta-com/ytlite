@@ -155,8 +155,7 @@ class SVGDataURIPackager:
         
         # HTML video player
         video_html = f'''
-        <video id="ytlite-video" width="100%" height="100%" controls autoplay
-               xmlns="http://www.w3.org/1999/xhtml">
+        <video id="ytlite-video" width="100%" height="100%" autoplay="true" controls="true" xmlns="http://www.w3.org/1999/xhtml">
             <source src="{media_data['video']}" type="video/mp4"/>
             Your browser does not support the video tag.
         </video>
@@ -210,6 +209,14 @@ class SVGDataURIPackager:
         
         // Auto-show metadata on load
         document.addEventListener('DOMContentLoaded', showMetadata);
+        
+        // Auto-play video when SVG is loaded
+        window.onload = function() {
+            var video = document.getElementById('ytlite-video');
+            if (video) {
+                video.play();
+            }
+        };
         '''
     
     def _svg_to_string(self, svg: ET.Element) -> str:

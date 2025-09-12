@@ -118,9 +118,23 @@ validate-app: ## Validate application health (deps + smoke generate + project pa
 validate-data: ## Validate generated data integrity (projects folders and required files)
 	bash scripts/validate-data.sh
 
-test-data: ## Check project folders and test media/SVG files for errors, remove corrupted files
-	bash scripts/test-data.sh
+# ==============================================================================
+# VALIDATION & TESTING
+# ==============================================================================
+validate: ## Validate generated data and app setup
+	bash scripts/validate.sh
 
+test-data: ## Test project folders, media, and SVG files for errors and remove faulty files
+	@echo "$(YELLOW)Testing project data for errors...$(NC)"
+	/home/tom/github/tom-sapletta-com/ytlite/venv/bin/python3 /home/tom/github/tom-sapletta-com/ytlite/src/test_data_validator.py test_data --remove-faulty
+	@echo "$(GREEN)✓ Project data testing completed$(NC)"
+
+test: ## Run automated tests
+	bash scripts/test.sh
+
+# ==============================================================================
+# PUBLISHING
+# ==============================================================================
 publish-pypi: ## Publish project to PyPI
 	@bash scripts/publish-pypi.sh
 
@@ -158,4 +172,3 @@ validate-data-report:
 	@echo "Validating ytlite data integrity..."
 	@python3 -m src.validator
 	@echo "Data validation complete. Check reports in the 'reports' directory."
-

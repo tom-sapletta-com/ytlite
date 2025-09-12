@@ -10,6 +10,9 @@
         .btn { padding: 8px 15px; margin: 5px; background: #007bff; color: white; text-decoration: none; border-radius: 3px; display: inline-block; }
         .btn:hover { background: #0056b3; }
         .status { background: #d4edda; border: 1px solid #c3e6cb; padding: 10px; border-radius: 5px; margin: 10px 0; }
+        .grid-view { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+        .project-card { border: 1px solid #ddd; padding: 15px; border-radius: 5px; }
+        .project-card img { width: 100%; height: auto; }
     </style>
 </head>
 <body>
@@ -19,20 +22,13 @@
             <strong>Status:</strong> ✅ Web GUI is working - <code>make stop</code> command added
         </div>
         
-        <div id="projects">
-            <h2>📁 Available Projects:</h2>
-            <div class="project">
-                <h3>test_project</h3>
-                <p>✅ SVG Package Available</p>
-                <a href="../output/projects/test_project/test_project.svg" target="_blank" class="btn">📄 Open SVG</a>
-                <a href="../output/projects/test_project/" target="_blank" class="btn">📂 Browse Files</a>
-            </div>
-            <div class="project">
-                <h3>demo</h3>
-                <p>✅ SVG Package Available</p>
-                <a href="../output/projects/demo/demo.svg" target="_blank" class="btn">📄 Open SVG</a>
-                <a href="../output/projects/demo/" target="_blank" class="btn">📂 Browse Files</a>
-            </div>
+        <div id="projects-list" class="grid-view">
+          <!-- Projects will be dynamically inserted here -->
+        </div>
+        <div id="project-preview" style="display: none;">
+          <h2>Project Preview</h2>
+          <img id="project-thumbnail" src="" alt="Project Thumbnail" style="max-width: 100%; height: auto;">
+          <div id="project-details"></div>
         </div>
         
         <div class="status">
@@ -43,5 +39,42 @@
             <strong>Interactive SVG:</strong> Click "📄 Open SVG" to view interactive video packages
         </div>
     </div>
+    
+    <script>
+      function updateProjectsList(projects) {
+        const projectsList = document.getElementById('projects-list');
+        projectsList.innerHTML = '';
+        projects.forEach(project => {
+          const projectCard = `
+            <div class="project-card" data-project="${project.name}">
+              <img src="/api/project/${project.name}/thumbnail" alt="${project.name} Thumbnail" style="width: 100%; height: auto;" onerror="this.src='placeholder.jpg'; this.alt='Thumbnail Not Available';">
+              <h3>${project.name}</h3>
+              <p>Last modified: ${project.lastModified}</p>
+            </div>
+          `;
+          projectsList.innerHTML += projectCard;
+        });
+
+        // Add click event to show preview
+        document.querySelectorAll('.project-card').forEach(card => {
+          card.addEventListener('click', function() {
+            const projectName = this.getAttribute('data-project');
+            showProjectPreview(projectName);
+          });
+        });
+      }
+
+      function showProjectPreview(projectName) {
+        const projectPreview = document.getElementById('project-preview');
+        const projectThumbnail = document.getElementById('project-thumbnail');
+        const projectDetails = document.getElementById('project-details');
+
+        projectPreview.style.display = 'block';
+        projectThumbnail.src = `/api/project/${projectName}/thumbnail`;
+        projectThumbnail.alt = `${projectName} Thumbnail`;
+        projectDetails.innerHTML = `<h3>${projectName}</h3>`;
+        // Additional project details can be fetched and displayed here
+      }
+    </script>
 </body>
 </html>

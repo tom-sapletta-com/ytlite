@@ -13,13 +13,17 @@ from typing import Optional
 from flask import Flask, request, jsonify, send_from_directory, render_template_string
 from dotenv import load_dotenv
 
-from ..logging_setup import get_logger
-from ..progress import load_progress
-from ..svg_packager import parse_svg_meta, update_svg_media
-from ..svg_datauri_packager import SVGDataURIPackager, create_svg_project
-from ..ytlite_main import YTLite
-from ..wordpress_publisher import WordPressPublisher
-from ..storage_nextcloud import NextcloudClient
+import sys
+import os
+sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
+
+from logging_setup import get_logger
+from progress import load_progress
+from svg_packager import parse_svg_meta, update_svg_media
+from svg_datauri_packager import SVGDataURIPackager, create_svg_project
+from ytlite_main import YTLite
+from wordpress_publisher import WordPressPublisher
+from storage_nextcloud import NextcloudClient
 
 logger = get_logger("web_gui.routes")
 
@@ -267,7 +271,7 @@ def setup_routes(app: Flask, base_dir: Path, output_dir: Path):
             
             # Try to use existing WordPress publisher
             try:
-                from ..publishers.wordpress_publisher import WordPressPublisher
+                from publishers.wordpress_publisher import WordPressPublisher
                 publisher = WordPressPublisher()
                 result = publisher.publish_project(project)
                 return jsonify({
@@ -381,6 +385,37 @@ def setup_routes(app: Flask, base_dir: Path, output_dir: Path):
         
         return jsonify({'projects': items})
 
+    @app.route('/api/svg_meta')
+    def api_svg_meta():
+        """Get metadata from legacy SVG meta endpoint."""
+        project = request.args.get('project', '').strip()
+        if not project:
+            return jsonify({'error': 'Missing project parameter'}), 400
+        
+        try:
+            # Try to find project in legacy directory first
+            project_dir = output_dir / 'projects' / project
+            if project_dir.exists():
+                # Look for SVG files in the project directory
+                svg_files = list(project_dir.glob('*.svg'))
+                if svg_files:
+                    svg_content = svg_files[0].read_text()
+                    meta = parse_svg_meta(svg_content)
+                    return jsonify(meta or {})
+            
+            # If not found, try SVG projects directory
+            svg_file = output_dir / 'svg_projects' / f"{project}.svg"
+            if svg_file.exists():
+                packager = SVGDataURIPackager(str(svg_file))
+                metadata = packager.get_metadata()
+                return jsonify(metadata or {})
+            
+            return jsonify({'error': 'Project not found'}), 404
+            
+        except Exception as e:
+            logger.error(f"Failed to get SVG meta for {project}: {e}")
+            return jsonify({'error': 'Failed to read SVG metadata'}), 500
+
     @app.route('/api/svg_metadata')
     def api_svg_metadata():
         """Get metadata from SVG project file."""
@@ -412,10 +447,9 @@ def setup_routes(app: Flask, base_dir: Path, output_dir: Path):
         project = request.args.get('project', '').strip()
         if not project:
             return jsonify({'error': 'Missing project parameter'}), 400
-        
         try:
-            from ..validator import validate_project_files
-            from ..svg_validator import SVGValidator
+            from validator import validate_project_files
+            from svg_validator import SVGValidator
             
             errors = []
             warnings = []
