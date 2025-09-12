@@ -8,9 +8,7 @@ def get_javascript_content():
     """Return the JavaScript content for the web GUI."""
     # This function should return the JavaScript content as a string
     # For now, return a placeholder to fix the import error
-    return "// Placeholder JavaScript content for YTLite Web GUI"
-
-JAVASCRIPT_CODE = """
+    return """
 // Load existing projects on page load
 document.addEventListener('DOMContentLoaded', function() {
   loadTheme();
@@ -777,4 +775,11 @@ function showMessage(text, type = 'info') {
     }
   }, 3000);
 }
+
+function showCreateForm() {
+  document.getElementById('createForm').style.display = 'block';
+  document.getElementById('createForm').scrollIntoView({behavior: 'smooth'});
+}
 """
+
+JAVASCRIPT_CODE = get_javascript_content()

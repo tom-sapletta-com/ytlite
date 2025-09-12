@@ -304,7 +304,7 @@ def update_svg_media(svg_path: str | Path, video_path: Optional[str] = None,
     
     txt = p.read_text(encoding="utf-8")
     # Naive replacement    # If the first method fails, try the <text id="project-metadata"> format
-    m = re.search(r'<text id="project-metadata">(.*?)</text>', txt, flags=re.DOTALL)
+    m = re.search(r'<text id="project-metadata">(.*?)</text>', txt, flags=re.S)
     if not m:
         return False, False, ['No JSON metadata block found in SVG']
     
@@ -349,15 +349,13 @@ def update_svg_media(svg_path: str | Path, video_path: Optional[str] = None,
     return True, is_valid, errors
 
 
-def parse_svg_meta(svg_path: str | Path) -> Optional[dict]:
-    p = Path(svg_path)
-    if not p.exists():
-        return None
+def parse_svg_meta(svg_content: str) -> Optional[dict]:
+    """Parse metadata from SVG file content."""
     import re
-    txt = p.read_text(encoding="utf-8")
+    import json
 
     # First, try to find the <script type="application/json"> format
-    m = re.search(r"<script type=\"application/json\">(.*?)</script>", txt, flags=re.S)
+    m = re.search(r'<script type="application/json">(.*?)</script>', svg_content, flags=re.S)
     if m:
         js = m.group(1).replace("&lt;", "<")
         try:
@@ -366,7 +364,7 @@ def parse_svg_meta(svg_path: str | Path) -> Optional[dict]:
             pass  # Fall through to the next method
 
     # If the first method fails, try the <text id="project-metadata"> format
-    m = re.search(r'<text id="project-metadata">(.*?)</text>', txt, flags=re.DOTALL)
+    m = re.search(r'<text id="project-metadata">(.*?)</text>', svg_content, flags=re.DOTALL)
     if m:
         js = m.group(1)
         try:
