@@ -418,11 +418,30 @@ class Validator:
         results["report_path"] = report_path
         return results
 
-    def _save_report(self, results, report_type):
-        report_path = os.path.join(self.reports_dir, f'{report_type}_validation_report_{datetime.now().strftime("%Y%m%d_%H%M%S")}.json')
-        with open(report_path, 'w') as f:
-            json.dump(results, f, indent=2)
-        console.print(f"[green]✓ Report saved to {report_path}[/]")
+    def _save_report(self, report: dict, report_type: str) -> str:
+        """Save the validation report to a file"""
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        report_dir = os.path.join(self.project_dir, "reports")
+        if not os.path.exists(report_dir):
+            os.makedirs(report_dir)
+        report_path = os.path.join(report_dir, f"{report_type}_validation_report_{timestamp}.json")
+        try:
+            # Custom encoder to handle non-serializable types
+            class CustomJSONEncoder(json.JSONEncoder):
+                def default(self, obj):
+                    if isinstance(obj, bool):
+                        return str(obj)
+                    elif isinstance(obj, (list, dict, tuple)):
+                        return json.JSONEncoder.default(self, obj)
+                    return str(obj)
+            
+            report_str = json.dumps(report, indent=2, cls=CustomJSONEncoder)
+            with open(report_path, "w") as f:
+                f.write(report_str)
+            logger.info(f"Saved {report_type} validation report to {report_path}")
+        except Exception as e:
+            logger.error(f"Failed to save {report_type} validation report", extra={"error": str(e)})
+            console.print(f"[bold red]Failed to save {report_type} validation report: {e}[/]")
         return report_path
 
     def validate_data(self, content_path: str = 'content') -> Tuple[dict, str]:
