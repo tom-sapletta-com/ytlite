@@ -8,6 +8,8 @@ from typing import Dict, Any, Optional
 import shutil
 
 from logging_setup import get_logger
+from media_validator import check_audio_silence, check_video_audio_silence
+from mqtt_client import publish_mqtt_event
 
 logger = get_logger("web_gui.helpers")
 
@@ -42,6 +44,25 @@ def generate_missing_media(project_name: str, output_dir: Path) -> tuple[bool, l
             generated_files.append(str(video_path))
         if thumb_path.exists():
             generated_files.append(str(thumb_path))
+
+        # Validate media loudness and publish MQTT notifications
+        try:
+            ares = check_audio_silence(audio_path)
+            vres = check_video_audio_silence(video_path)
+            publish_mqtt_event(
+                'postgen_audio_silence' if ares.get('silent') else 'postgen_audio_ok',
+                'error' if ares.get('silent') else 'info',
+                project_name,
+                {'check': ares}
+            )
+            publish_mqtt_event(
+                'postgen_video_silence' if (vres.get('silent') or not vres.get('has_audio')) else 'postgen_video_ok',
+                'error' if (vres.get('silent') or not vres.get('has_audio')) else 'info',
+                project_name,
+                {'check': vres}
+            )
+        except Exception as _e:
+            logger.warning(f"Media validation publish failed for {project_name}: {_e}")
 
         return True, generated_files, ""
 
@@ -117,6 +138,25 @@ def create_svg_project(project_name: str, content: str, metadata: Dict[str, Any]
         if not video_path.exists():
             logger.error(f"Video file not generated for {project_name} at {video_path}")
             return None
+
+        # Validate audio/video and publish MQTT notifications
+        try:
+            ares = check_audio_silence(audio_path)
+            vres = check_video_audio_silence(video_path)
+            publish_mqtt_event(
+                'postgen_audio_silence' if ares.get('silent') else 'postgen_audio_ok',
+                'error' if ares.get('silent') else 'info',
+                project_name,
+                {'check': ares}
+            )
+            publish_mqtt_event(
+                'postgen_video_silence' if (vres.get('silent') or not vres.get('has_audio')) else 'postgen_video_ok',
+                'error' if (vres.get('silent') or not vres.get('has_audio')) else 'info',
+                project_name,
+                {'check': vres}
+            )
+        except Exception as _e:
+            logger.warning(f"Media validation failed for {project_name}: {_e}")
 
         # If YTLite already produced a packaged SVG in the project directory, reuse it
         packaged_svg = project_dir / f"{project_name}.svg"
