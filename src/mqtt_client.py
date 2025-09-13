@@ -7,7 +7,9 @@ Publishes JSON payloads under topic: {base}/events/{project or 'global'}/{event}
 from __future__ import annotations
 import os
 import json
-from typing import Any, Optional
+import time
+import platform
+from typing import Any, Optional, Sequence
 from logging_setup import get_logger
 
 logger = get_logger("mqtt")
@@ -46,15 +48,29 @@ def _connect_client() -> Optional["mqtt.Client"]:
 def publish_mqtt_event(event: str,
                        level: str = "info",
                        project: Optional[str] = None,
-                       details: Optional[dict[str, Any]] = None) -> bool:
-    """Publish a structured event over MQTT. Returns True if published, else False."""
+                       details: Optional[dict[str, Any]] = None,
+                       tags: Optional[Sequence[str]] = None) -> bool:
+    """Publish a structured event over MQTT. Returns True if published, else False.
+    Adds metadata: ts, host, pid, app, phase, threshold_db, tags.
+    """
     base = os.getenv("MQTT_BASE_TOPIC", "ytlite")
     topic = f"{base}/events/{project or 'global'}/{event}"
+    # infer phase from event name
+    phase = 'postgen' if event.startswith('postgen_') else ('preplay' if event.startswith('preplay_') else None)
+    # include optional threshold if defined
+    threshold_db = os.getenv("MEDIA_SILENCE_DB")
     payload = {
         "event": event,
         "level": level,
         "project": project,
         "details": details or {},
+        "ts": time.time(),
+        "host": platform.node(),
+        "pid": os.getpid(),
+        "app": "ytlite",
+        "phase": phase,
+        "threshold_db": float(threshold_db) if threshold_db else None,
+        "tags": list(tags) if tags else None,
     }
     client = _connect_client()
     if client is None:

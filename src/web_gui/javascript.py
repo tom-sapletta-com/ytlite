@@ -45,6 +45,30 @@ function switchProjectView(view) {
     projectsTable.classList.remove('active');
     loadProjects(); // Reload grid view
   }
+
+// Manual media check via button
+async function checkMedia(projectName) {
+  if (!projectName) return;
+  try {
+    const res = await fetch(`/api/check_media?project=${encodeURIComponent(projectName)}`, { cache: 'no-store' });
+    const data = await res.json();
+    if (!res.ok) {
+      showMessage(`❌ Media check failed: ${data.error || data.message || res.status}`, 'error');
+      logEvent(`Media check failed for ${projectName}`, 'error', data);
+      return;
+    }
+    const a = data.audio || {}; const v = data.video || {};
+    const ok = !!data.ok;
+    const lines = [];
+    lines.push(`Audio: ${a.exists ? 'exists' : 'missing'}${a.mean_db != null ? `, mean=${a.mean_db.toFixed ? a.mean_db.toFixed(1) : a.mean_db} dB` : ''}${a.silent ? ', silent' : ''}`);
+    lines.push(`Video: ${v.exists ? 'exists' : 'missing'}${v.has_audio ? ', has_audio' : ', no audio'}${v.mean_db != null ? `, mean=${v.mean_db.toFixed ? v.mean_db.toFixed(1) : v.mean_db} dB` : ''}${v.silent ? ', silent' : ''}`);
+    const msg = `Media check for "${projectName}":\n` + lines.join('\n');
+    showMessage(msg, ok ? 'success' : 'warning');
+    logEvent(`Media check for ${projectName}`, ok ? 'success' : 'warn', data);
+  } catch (e) {
+    showMessage(`❌ Media check error: ${e.message}`, 'error');
+  }
+}
 }
 
 // --- Media Preview ---
@@ -92,10 +116,16 @@ async function updateMediaPreview(projectName) {
       <button onclick="generateMedia('${projectName}')" class="btn btn-primary" style="margin-top:10px;">
         🎬 Generate Missing Media
       </button>
+      <button onclick="checkMedia('${projectName}')" class="btn" style="margin-top:10px; margin-left:8px;">
+        🔎 Check Media
+      </button>
     `;
     logEvent(`Media preview: no files found for ${projectName}`, 'warn');
   } else {
-    body.innerHTML = blocks.join('');
+    body.innerHTML = blocks.join('') + `
+      <div style="margin-top:8px;">
+        <button onclick="checkMedia('${projectName}')" class="btn">🔎 Check Media</button>
+      </div>`;
     // Attach pre-playback validation listeners
     try {
       const v = document.getElementById(`video-${projectName}`);
