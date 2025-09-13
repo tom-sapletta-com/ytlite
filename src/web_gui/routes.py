@@ -162,7 +162,6 @@ def setup_routes(app: Flask, base_dir: Path, output_dir: Path):
             return jsonify({'error': 'Missing project name'}), 400
 
         try:
-            from . import helpers
             success, generated_files, error = helpers.generate_missing_media(project_name, output_dir)
             
             if success:
@@ -202,8 +201,6 @@ def setup_routes(app: Flask, base_dir: Path, output_dir: Path):
                 load_dotenv(str(proj_env))
                 logger.info(f"Loaded per-project .env from {proj_env}")
 
-            from .helpers import create_svg_project
-            
             # Prepare metadata for SVG project creation
             metadata = {
                 'project': project,
@@ -215,8 +212,6 @@ def setup_routes(app: Flask, base_dir: Path, output_dir: Path):
                 'language': data.get('lang', 'en'),
                 'created': datetime.now().isoformat()
             }
-
-            force_regenerate = data.get('force_regenerate', False)
 
             # Create SVG project using new architecture
             svg_file = output_dir / 'svg_projects' / f"{project}.svg"
@@ -235,7 +230,7 @@ def setup_routes(app: Flask, base_dir: Path, output_dir: Path):
                     project_name=project,
                     content=data.get('markdown', ''),
                     metadata=data,
-                    output_path=output_dir,
+                    output_path=svg_file,
                     force_regenerate=force_regenerate
                 )
                 

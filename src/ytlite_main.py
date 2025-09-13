@@ -252,7 +252,7 @@ class YTLite:
         (project_dir / "description.md").write_text("\n".join(fm_lines) + description_body + "\n", encoding="utf-8")
 
         # Create SVG single-file package with validation
-        logger.info("Packaging start")
+        logger.info("Building SVG package")
         svg_path, is_valid, validation_errors = build_svg(project_dir, metadata, paragraphs, video_path, audio_path, thumbnail_path)
         
         # Report validation results

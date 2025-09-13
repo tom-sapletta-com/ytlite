@@ -36,24 +36,51 @@ class VideoGenerator:
         self.resolution = tuple(config.get("resolution", [1280, 720]))
         self.fps = config.get("fps", 30)
         self.font_size = config.get("font_size", 48)
+        # Cache fonts by (path, size) and avoid repeating fallback warnings
+        self._font_cache: dict[tuple[str, int], ImageFont.ImageFont] = {}
+        self._font_warning_emitted = False
         
     def _pick_font(self, lang: str | None, size: int) -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
-        # Language-aware font selection (DejaVu covers PL/DE/EN). Allow override via config font_path
+        """Pick a font with caching and environment/config overrides.
+        Respects config['font_path'], env YTLITE_FONT_PATH or FONT_PATH.
+        Emits the fallback warning at most once per process.
+        """
+        # Prefer explicit overrides
         font_path = self.config.get("font_path")
-        candidates = []
+        env_font = os.getenv("YTLITE_FONT_PATH") or os.getenv("FONT_PATH")
+        candidates: list[str] = []
         if font_path:
             candidates.append(font_path)
-        # Common Linux path
-        candidates.append("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf")
-        # MacOS
-        candidates.append("/Library/Fonts/Arial Unicode.ttf")
-        # Fallbacks
+        if env_font:
+            candidates.append(env_font)
+        # Common font locations across Linux/macOS
+        candidates.extend([
+            "/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf",
+            "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+            "/usr/share/fonts/truetype/freefont/FreeSansBold.ttf",
+            "/Library/Fonts/Arial Unicode.ttf",
+        ])
+
         for fp in candidates:
+            if not fp:
+                continue
+            cache_key = (fp, int(size))
+            if cache_key in self._font_cache:
+                return self._font_cache[cache_key]
             try:
-                return ImageFont.truetype(fp, size)
+                font = ImageFont.truetype(fp, size)
+                self._font_cache[cache_key] = font
+                return font
             except Exception:
                 continue
-        console.print("[yellow]Warning: Could not load font, using default[/]")
+        # Fallback
+        if not self._font_warning_emitted:
+            console.print("[yellow]Warning: Could not load preferred fonts, using default[/]")
+            try:
+                logger.warning("Falling back to default font; set config.font_path or YTLITE_FONT_PATH for custom font")
+            except Exception:
+                pass
+            self._font_warning_emitted = True
         return ImageFont.load_default()
 
     def _parse_hex(self, hexstr: str) -> tuple[int, int, int]:
@@ -156,40 +183,43 @@ class VideoGenerator:
         
         console.print(f"[cyan]Creating video from {len(slides)} slides...[/]")
         logger.info("Create video start", extra={"slides": len(slides), "audio": audio_path, "output": output_path})
-        
+        audio = None
+        clips: list[ImageClip] = []
+        video = None
+        final_video = None
         try:
             # Load audio to get duration
             audio = AudioFileClip(audio_path)
-            total_duration = audio.duration
-            slide_duration = total_duration / len(slides)
-            
+            total_duration = max(0.1, float(audio.duration or 0.1))
+            slide_count = max(1, len(slides))
+            slide_duration = total_duration / slide_count
+
             # Create video clips from slides
-            clips = []
             for slide_path in slides:
                 try:
                     clip = ImageClip(slide_path).set_duration(slide_duration)
                     clips.append(clip)
                 except Exception as e:
                     console.print(f"[red]Error creating clip from slide {slide_path}: {e}[/]")
-                    logger.error(f"Error creating clip from slide {slide_path}", extra={"error": str(e), "slide_path": slide_path})
+                    logger.error("Error creating clip from slide", extra={"error": str(e), "slide_path": slide_path})
                     raise
-            
+
             # Concatenate clips
             try:
                 video = concatenate_videoclips(clips, method="compose")
             except Exception as e:
                 console.print(f"[red]Error concatenating video clips: {e}[/]")
-                logger.error(f"Error concatenating video clips", extra={"error": str(e)})
+                logger.error("Error concatenating video clips", extra={"error": str(e)})
                 raise
-            
+
             # Add audio
             try:
                 final_video = video.set_audio(audio)
             except Exception as e:
                 console.print(f"[red]Error setting audio to video: {e}[/]")
-                logger.error(f"Error setting audio to video", extra={"error": str(e)})
+                logger.error("Error setting audio to video", extra={"error": str(e)})
                 raise
-            
+
             # Write output
             console.print(f"[cyan]Writing video to {output_path}...[/]")
             try:
@@ -198,88 +228,135 @@ class VideoGenerator:
                     fps=self.fps,
                     codec="libx264",
                     audio_codec="aac",
-                    logger=None,  
+                    logger=None,
                     temp_audiofile='temp-audio.m4a',
                     remove_temp=True
                 )
             except Exception as e:
                 console.print(f"[red]Error writing video file: {e}[/]")
-                logger.error(f"Error writing video file", extra={"error": str(e), "output_file": output_path})
+                logger.error("Error writing video file", extra={"error": str(e), "output_file": output_path})
                 raise
-            
+
             console.print(f"[green]✓ Video created: {output_path}[/]")
             logger.info("Video created", extra={"output": output_path})
-            
-            # Cleanup
-            for slide_path in slides:
-                if os.path.exists(slide_path):
-                    os.remove(slide_path)
         except Exception as e:
             console.print(f"[red]Failed to create video: {e}[/]")
-            logger.error(f"Failed to create video", extra={"error": str(e)})
+            logger.error("Failed to create video", extra={"error": str(e)})
             raise
-        
+        finally:
+            # Cleanup resources and temp files
+            for clip in clips:
+                try:
+                    clip.close()
+                except Exception:
+                    pass
+            try:
+                if final_video is not None:
+                    final_video.close()
+            except Exception:
+                pass
+            try:
+                if video is not None:
+                    video.close()
+            except Exception:
+                pass
+            try:
+                if audio is not None:
+                    audio.close()
+            except Exception:
+                pass
+            for slide_path in slides:
+                try:
+                    if os.path.exists(slide_path):
+                        os.remove(slide_path)
+                except Exception:
+                    pass
+
     def create_shorts(self, video_path: str, output_path: str):
         """Create YouTube Shorts from video"""
-        
         console.print(f"[cyan]Creating Shorts from {video_path}...[/]")
-        
-        video = VideoFileClip(video_path)
-        
-        # Get first 60 seconds
-        duration = min(60, video.duration)
-        short_clip = video.subclip(0, duration)
-        
-        # Resize to 9:16 aspect ratio with compatibility across MoviePy versions
+        video = None
+        short_clip = None
+        txt_clip = None
+        final_short = None
         try:
-            # Prefer functional FX (MoviePy 2.x compatible)
-            try:
-                from moviepy.video.fx.resize import resize as fx_resize
-            except Exception:
-                from moviepy.video.fx.all import resize as fx_resize
-            try:
-                from moviepy.video.fx.crop import crop as fx_crop
-            except Exception:
-                from moviepy.video.fx.all import crop as fx_crop
-            short_clip = fx_resize(short_clip, height=1920)
-            short_clip = fx_crop(short_clip, x_center=short_clip.w/2, width=1080)
-        except Exception:
-            # Fallback to method API (MoviePy 1.x)
-            try:
-                short_clip = short_clip.resize(height=1920)
-                short_clip = short_clip.crop(x_center=short_clip.w/2, width=1080)
-            except Exception as e:
-                console.print(f"[yellow]Warning: Failed to apply resize/crop FX: {e}[/]")
+            video = VideoFileClip(video_path)
 
-        # Add watermark
-        try:
-            txt_clip = TextClip("SHORTS", fontsize=40, color='white', font='Arial')
-            txt_clip = txt_clip.set_position(('center', 'bottom')).set_duration(short_clip.duration)
-            final_short = CompositeVideoClip([short_clip, txt_clip])
-        except:
-            console.print("[yellow]Warning: Could not add watermark[/]")
-            final_short = short_clip
-        
-        # Write output
-        final_short.write_videofile(
-            output_path,
-            fps=self.fps,
-            codec="libx264",
-            audio_codec="aac",
-            logger=None
-        )
-        
-        console.print(f"[green]✓ Shorts created: {output_path}[/]")
+            # Get first 60 seconds
+            duration = min(60, video.duration)
+            short_clip = video.subclip(0, duration)
+
+            # Resize to 9:16 aspect ratio with compatibility across MoviePy versions
+            try:
+                # Prefer functional FX (MoviePy 2.x compatible)
+                try:
+                    from moviepy.video.fx.resize import resize as fx_resize
+                except Exception:
+                    from moviepy.video.fx.all import resize as fx_resize
+                try:
+                    from moviepy.video.fx.crop import crop as fx_crop
+                except Exception:
+                    from moviepy.video.fx.all import crop as fx_crop
+                short_clip = fx_resize(short_clip, height=1920)
+                short_clip = fx_crop(short_clip, x_center=short_clip.w/2, width=1080)
+            except Exception:
+                # Fallback to method API (MoviePy 1.x)
+                try:
+                    short_clip = short_clip.resize(height=1920)
+                    short_clip = short_clip.crop(x_center=short_clip.w/2, width=1080)
+                except Exception as e:
+                    console.print(f"[yellow]Warning: Failed to apply resize/crop FX: {e}[/]")
+
+            # Add watermark
+            try:
+                txt_clip = TextClip("SHORTS", fontsize=40, color='white', font='Arial')
+                txt_clip = txt_clip.set_position(('center', 'bottom')).set_duration(short_clip.duration)
+                final_short = CompositeVideoClip([short_clip, txt_clip])
+            except Exception:
+                console.print("[yellow]Warning: Could not add watermark[/]")
+                final_short = short_clip
+
+            # Write output
+            final_short.write_videofile(
+                output_path,
+                fps=self.fps,
+                codec="libx264",
+                audio_codec="aac",
+                logger=None
+            )
+
+            console.print(f"[green]✓ Shorts created: {output_path}[/]")
+        finally:
+            # Close resources
+            for clip in [txt_clip, short_clip, final_short]:
+                try:
+                    if clip is not None:
+                        clip.close()
+                except Exception:
+                    pass
+            try:
+                if video is not None:
+                    video.close()
+            except Exception:
+                pass
 
     def create_thumbnail(self, video_path: str, output_path: str):
         """Create a thumbnail image from a representative video frame"""
         console.print(f"[cyan]Creating thumbnail for {video_path}...[/]")
         logger.info("Create thumbnail start", extra={"video": video_path, "output": output_path})
-        clip = VideoFileClip(video_path)
-        # Take frame from 1/3rd of the video or at 0.5s if too short
-        ts = max(0.5, min(clip.duration - 0.05, clip.duration / 3))
-        frame = clip.get_frame(ts)
-        img = Image.fromarray(frame)
+        clip = None
+        try:
+            clip = VideoFileClip(video_path)
+            # Take frame from 1/3rd of the video or at 0.5s if too short
+            ts = max(0.5, min(clip.duration - 0.05, clip.duration / 3))
+            frame = clip.get_frame(ts)
+            img = Image.fromarray(frame)
+        finally:
+            try:
+                if clip is not None:
+                    clip.close()
+            except Exception:
+                pass
         Path(output_path).parent.mkdir(parents=True, exist_ok=True)
         img.save(output_path, format='JPEG', quality=90)
         console.print(f"[green]✓ Thumbnail created: {output_path}[/]")

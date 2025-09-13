@@ -19,29 +19,29 @@ def generate_missing_media(project_name: str, output_dir: Path) -> tuple[bool, l
     if not project_dir.exists():
         return False, [], f"Project directory {project_dir} not found."
 
-    # Use description.md or the primary .md file as the source
-    md_file = project_dir / f"{project_name}.md"
+    # Prefer existing description.md, otherwise fallback to project_name.md
+    md_file = project_dir / 'description.md'
     if not md_file.exists():
-        md_file = project_dir / 'description.md'
-    
+        md_file = project_dir / f"{project_name}.md"
+
     if not md_file.exists():
         return False, [], f"No markdown file found in {project_dir}."
 
-    ytl = YTLite(output_dir=str(output_dir), project_name=project_name)
-    generated_files = []
+    generated_files: list[str] = []
     try:
-        # YTLite's main method handles the logic of checking existence before generating
-        # We can call it to ensure all media is present
-        # The main method should handle not re-generating existing files
-        ytl.main(markdown_path=str(md_file))
-        
-        # Verify which files were actually created or already existed
-        if ytl.audio_path and Path(ytl.audio_path).exists():
-            generated_files.append(ytl.audio_path)
-        if ytl.video_path and Path(ytl.video_path).exists():
-            generated_files.append(ytl.video_path)
-        if ytl.thumb_path and Path(ytl.thumb_path).exists():
-            generated_files.append(ytl.thumb_path)
+        ytlite = YTLite(output_dir=str(output_dir), project_name=project_name)
+        ytlite.generate_video(str(md_file))
+
+        audio_path = output_dir / 'audio' / f"{project_name}.mp3"
+        video_path = output_dir / 'videos' / f"{project_name}.mp4"
+        thumb_path = output_dir / 'thumbnails' / f"{project_name}.jpg"
+
+        if audio_path.exists():
+            generated_files.append(str(audio_path))
+        if video_path.exists():
+            generated_files.append(str(video_path))
+        if thumb_path.exists():
+            generated_files.append(str(thumb_path))
 
         return True, generated_files, ""
 

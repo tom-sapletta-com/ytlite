@@ -38,7 +38,7 @@ upload: ## Upload generated videos to YouTube
 upload-project: ## Upload a single project's video (usage: make upload-project PROJECT=<name> [PRIVACY=unlisted])
 	@python3 -u src/youtube_uploader.py upload_project --project $(PROJECT) $(if $(PRIVACY),--privacy $(PRIVACY),)
 
-publish: generate shorts ## Full pipeline: generate + shorts + upload (no upload by default)
+publish: ## Full pipeline: generate + shorts (upload is manual via `make upload`)
 	bash scripts/publish.sh
 
 daily: ## Generate daily content automatically
