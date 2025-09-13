@@ -189,7 +189,7 @@ class YTLite:
                 thumbnail_path=str(thumbnail_path),
                 shorts_path=str(shorts_path) if shorts_path else None,
             )
-            logger.info("Packaging done", extra={"project": base_name})
+            logger.info("Packaging step completed for project", extra={"project": base_name})
             pr.update("package", "Packaging done", 98)
 
             pr.done("Completed")

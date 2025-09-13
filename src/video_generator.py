@@ -345,6 +345,7 @@ class VideoGenerator:
         console.print(f"[cyan]Creating thumbnail for {video_path}...[/]")
         logger.info("Create thumbnail start", extra={"video": video_path, "output": output_path})
         clip = None
+        img = None
         try:
             clip = VideoFileClip(video_path)
             # Take frame from 1/3rd of the video or at 0.5s if too short
@@ -358,6 +359,10 @@ class VideoGenerator:
             except Exception:
                 pass
         Path(output_path).parent.mkdir(parents=True, exist_ok=True)
+        if img is None:
+            console.print(f"[yellow]Warning: Could not extract frame for thumbnail from {video_path}[/]")
+            logger.warning("Thumbnail extraction failed; no image frame", extra={"video": video_path})
+            return
         img.save(output_path, format='JPEG', quality=90)
         console.print(f"[green]✓ Thumbnail created: {output_path}[/]")
         logger.info("Thumbnail created", extra={"output": output_path})

@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import base64
 import json
+import re
 from pathlib import Path
 from typing import Optional
 from datetime import datetime, timezone
@@ -302,7 +303,7 @@ def update_svg_media(svg_path: str | Path, video_path: Optional[str] = None,
         _backup_current_version(p.parent, p)
     
     txt = p.read_text(encoding="utf-8")
-    # Naive replacement    # If the first method fails, try the <text id="project-metadata"> format
+    # Look for embedded JSON metadata inside <text id="project-metadata"> ... </text>
     m = re.search(r'<text id="project-metadata">(.*?)</text>', txt, flags=re.S)
     if not m:
         return False, False, ['No JSON metadata block found in SVG']
