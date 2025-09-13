@@ -18,7 +18,16 @@ import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 from logging_setup import get_logger
-from . import helpers
+
+# Import helpers directly to avoid import issues
+import sys
+import os
+# Add the web_gui directory to path if needed
+web_gui_dir = os.path.dirname(__file__)
+if web_gui_dir not in sys.path:
+    sys.path.insert(0, web_gui_dir)
+
+import helpers
 
 logger = get_logger("web_gui.routes")
 
