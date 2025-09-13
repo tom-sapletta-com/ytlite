@@ -54,6 +54,11 @@ def check_audio_silence(audio_path: Path, silence_threshold_db: float = -50.0) -
     """Check if an audio file (wav/mp3) is silent.
     Returns dict with keys: exists, mean_db, silent, method, error(optional)
     """
+    # ENV override
+    try:
+        silence_threshold_db = float(os.getenv("MEDIA_SILENCE_DB", str(silence_threshold_db)))
+    except Exception:
+        pass
     res: Dict[str, Any] = {"file": str(audio_path), "exists": audio_path.exists(), "silent": True, "method": None}
     if not audio_path.exists():
         res["error"] = "audio_not_found"
@@ -117,6 +122,11 @@ def check_video_audio_silence(video_path: Path, silence_threshold_db: float = -5
     """Check if an MP4 video has an audio stream and whether it is silent.
     Returns dict with keys: exists, has_audio, mean_db(optional), silent, method, error(optional)
     """
+    # ENV override
+    try:
+        silence_threshold_db = float(os.getenv("MEDIA_SILENCE_DB", str(silence_threshold_db)))
+    except Exception:
+        pass
     res: Dict[str, Any] = {"file": str(video_path), "exists": video_path.exists(), "has_audio": False, "silent": True, "method": None}
     if not video_path.exists():
         res["error"] = "video_not_found"

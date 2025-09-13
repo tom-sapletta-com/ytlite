@@ -18,6 +18,8 @@ import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 from logging_setup import get_logger
+from media_validator import check_audio_silence, check_video_audio_silence
+from mqtt_client import publish_mqtt_event
 
 # Import helpers directly to avoid import issues
 import sys
@@ -173,6 +175,39 @@ def setup_routes(app: Flask, base_dir: Path, output_dir: Path):
         except Exception as e:
             logger.error(f"Error in /api/generate_media for {project_name}: {e}")
             return jsonify({'error': 'An unexpected error occurred'}), 500
+
+    @app.route('/api/check_media')
+    def api_check_media():
+        """Validate project's audio/video before playback and publish MQTT warnings if silent/missing."""
+        project = request.args.get('project', '').strip()
+        if not project:
+            return jsonify({'error': 'Missing project parameter'}), 400
+        try:
+            audio_path = output_dir / 'audio' / f"{project}.mp3"
+            video_path = output_dir / 'videos' / f"{project}.mp4"
+            ares = check_audio_silence(audio_path)
+            vres = check_video_audio_silence(video_path)
+            # Publish MQTT events
+            try:
+                publish_mqtt_event(
+                    'preplay_audio_silence' if ares.get('silent') else 'preplay_audio_ok',
+                    'error' if ares.get('silent') else 'info',
+                    project,
+                    {'check': ares}
+                )
+                publish_mqtt_event(
+                    'preplay_video_silence' if (vres.get('silent') or not vres.get('has_audio')) else 'preplay_video_ok',
+                    'error' if (vres.get('silent') or not vres.get('has_audio')) else 'info',
+                    project,
+                    {'check': vres}
+                )
+            except Exception:
+                pass
+            ok = bool(ares.get('exists') and not ares.get('silent') and vres.get('exists') and vres.get('has_audio') and not vres.get('silent'))
+            return jsonify({'project': project, 'audio': ares, 'video': vres, 'ok': ok}), 200
+        except Exception as e:
+            logger.error(f"/api/check_media failed for {project}: {e}")
+            return jsonify({'error': 'Failed to check media'}), 500
 
     @app.route('/api/generate', methods=['POST'])
     def api_generate():

@@ -340,8 +340,11 @@ class VideoGenerator:
             except Exception:
                 pass
 
-    def create_thumbnail(self, video_path: str, output_path: str):
-        """Create a thumbnail image from a representative video frame"""
+    def create_thumbnail(self, video_path: str, output_path: str, audio_path: Optional[str] = None):
+        """Create a thumbnail image from a representative video frame and overlay
+        an audio waveform in the bottom 20% of the image if audio is available.
+        If audio is missing or fails to load, draw a baseline instead.
+        """
         console.print(f"[cyan]Creating thumbnail for {video_path}...[/]")
         logger.info("Create thumbnail start", extra={"video": video_path, "output": output_path})
         clip = None
@@ -358,6 +361,74 @@ class VideoGenerator:
                     clip.close()
             except Exception:
                 pass
+        # Overlay audio waveform on the bottom 20% of the image
+        if img is not None:
+            try:
+                overlay_h = max(10, int(img.height * 0.20))
+                wave_top = img.height - overlay_h
+                baseline_y = wave_top + overlay_h // 2
+
+                # Prepare transparent overlay for alpha compositing
+                overlay = Image.new('RGBA', img.size, (0, 0, 0, 0))
+                odraw = ImageDraw.Draw(overlay)
+                # Semi-transparent background for the waveform strip
+                odraw.rectangle([0, wave_top, img.width, img.height], fill=(0, 0, 0, 120))
+
+                drew_waveform = False
+                if audio_path and os.path.exists(audio_path):
+                    audio = None
+                    try:
+                        audio = AudioFileClip(audio_path)
+                        duration = float(audio.duration or 0.0)
+                        if duration > 0:
+                            width = img.width
+                            # Sample amplitude at evenly spaced times across the track
+                            amps = []
+                            for x in range(width):
+                                t = (x + 0.5) / width * duration
+                                try:
+                                    sample = audio.get_frame(t)
+                                    # sample can be scalar or array-like (channels)
+                                    if hasattr(sample, '__len__'):
+                                        val = sum(abs(float(s)) for s in sample) / max(1, len(sample))
+                                    else:
+                                        val = abs(float(sample))
+                                    amps.append(val)
+                                except Exception:
+                                    amps.append(0.0)
+
+                            # Scale amplitudes to fit overlay height (use robust max)
+                            if any(a > 0 for a in amps):
+                                srt = sorted(amps)
+                                idx = int(0.95 * (len(srt) - 1)) if srt else 0
+                                ref = srt[idx] if srt else 1.0
+                                ref = max(ref, max(amps), 1e-6)
+                                half_h = int(overlay_h * 0.45)
+                                color = (0, 255, 136, 180)  # bright green with alpha
+                                for x, a in enumerate(amps):
+                                    dy = int(min(half_h, a / ref * half_h))
+                                    odraw.line([(x, baseline_y - dy), (x, baseline_y + dy)], fill=color)
+                                drew_waveform = True
+                    except Exception as e:
+                        logger.warning("Waveform overlay failed", extra={"audio": audio_path, "error": str(e)})
+                    finally:
+                        try:
+                            if audio is not None:
+                                audio.close()
+                        except Exception:
+                            pass
+
+                # If not drawn, draw a simple baseline
+                if not drew_waveform:
+                    odraw.line([(0, baseline_y), (img.width - 1, baseline_y)], fill=(255, 255, 255, 160), width=2)
+
+                # Composite overlay onto image
+                base_rgba = img.convert('RGBA')
+                img = Image.alpha_composite(base_rgba, overlay).convert('RGB')
+                logger.info("Thumbnail waveform overlay applied", extra={"audio": audio_path, "output": output_path})
+            except Exception as e:
+                logger.warning("Thumbnail overlay step failed", extra={"error": str(e), "output": output_path})
+
         Path(output_path).parent.mkdir(parents=True, exist_ok=True)
         if img is None:
             console.print(f"[yellow]Warning: Could not extract frame for thumbnail from {video_path}[/]")

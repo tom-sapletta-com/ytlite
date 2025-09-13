@@ -35,6 +35,10 @@ def generate_missing_media(project_name: str, output_dir: Path) -> tuple[bool, l
         ytlite.generate_video(str(md_file))
 
         audio_path = output_dir / 'audio' / f"{project_name}.mp3"
+        if not audio_path.exists():
+            alt_wav = output_dir / 'audio' / f"{project_name}.wav"
+            if alt_wav.exists():
+                audio_path = alt_wav
         video_path = output_dir / 'videos' / f"{project_name}.mp4"
         thumb_path = output_dir / 'thumbnails' / f"{project_name}.jpg"
 
@@ -130,6 +134,15 @@ def create_svg_project(project_name: str, content: str, metadata: Dict[str, Any]
         audio_path = audio_dir / f"{project_name}.mp3"
         if not audio_path.exists():
             audio_path = project_dir / f"{project_name}.mp3"
+        if not audio_path.exists():
+            # WAV fallbacks
+            ap = output_dir / 'audio' / f"{project_name}.wav"
+            if ap.exists():
+                audio_path = ap
+            else:
+                ap2 = project_dir / f"{project_name}.wav"
+                if ap2.exists():
+                    audio_path = ap2
 
         thumbnail_path = thumbs_dir / f"{project_name}.jpg"
         if not thumbnail_path.exists():

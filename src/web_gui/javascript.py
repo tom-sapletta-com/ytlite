@@ -78,9 +78,9 @@ async function updateMediaPreview(projectName) {
     if (it.key === 'thumb') {
       blocks.push(`<div class="media-item"><h4>🖼️ ${it.label}</h4><img class="thumb" src="${it.url}" alt="thumbnail"></div>`);
     } else if (it.key === 'video') {
-      blocks.push(`<div class="media-item"><h4>🎬 ${it.label}</h4><video class="thumb" src="${it.url}" controls></video></div>`);
+      blocks.push(`<div class="media-item"><h4>🎬 ${it.label}</h4><video id="video-${projectName}" class="thumb" src="${it.url}" controls></video></div>`);
     } else if (it.key === 'audio') {
-      blocks.push(`<div class="media-item"><h4>🔊 ${it.label}</h4><audio src="${it.url}" controls></audio></div>`);
+      blocks.push(`<div class="media-item"><h4>🔊 ${it.label}</h4><audio id="audio-${projectName}" src="${it.url}" controls></audio></div>`);
     } else if (it.key === 'svg') {
       blocks.push(`<div class="media-item"><h4>📄 ${it.label}</h4><a href="${it.url}" target="_blank" class="btn">Open SVG</a></div>`);
     }
@@ -96,12 +96,48 @@ async function updateMediaPreview(projectName) {
     logEvent(`Media preview: no files found for ${projectName}`, 'warn');
   } else {
     body.innerHTML = blocks.join('');
+    // Attach pre-playback validation listeners
+    try {
+      const v = document.getElementById(`video-${projectName}`);
+      if (v) v.addEventListener('play', (ev) => prePlaybackCheck(projectName, v, 'video'));
+      const a = document.getElementById(`audio-${projectName}`);
+      if (a) a.addEventListener('play', (ev) => prePlaybackCheck(projectName, a, 'audio'));
+    } catch (e) { /* ignore */ }
     logEvent(`Media preview updated for ${projectName}`, 'info', {count: blocks.length});
   }
 }
 
 // Expose immediately after definition to avoid scope issues
 window.updateMediaPreview = updateMediaPreview;
+
+// Pre-playback media validator: stops playback if silence/missing audio is detected
+async function prePlaybackCheck(projectName, mediaEl, kind) {
+  try {
+    const res = await fetch(`/api/check_media?project=${encodeURIComponent(projectName)}`, { cache: 'no-store' });
+    const data = await res.json();
+    if (!res.ok) {
+      showMessage(`❌ Media check failed: ${data.error || data.message || res.status}`, 'error');
+      return;
+    }
+    if (kind === 'audio') {
+      const a = data.audio || {};
+      if (!a.exists || a.silent) {
+        showMessage('⚠️ Audio appears silent or missing. Playback stopped.', 'warning');
+        logEvent(`Pre-playback audio check failed for ${projectName}`, 'warn', a);
+        try { mediaEl.pause(); mediaEl.currentTime = 0; } catch (_) {}
+      }
+    } else {
+      const v = data.video || {};
+      if (!v.exists || !v.has_audio || v.silent) {
+        showMessage('⚠️ Video audio missing or silent. Playback stopped.', 'warning');
+        logEvent(`Pre-playback video check failed for ${projectName}`, 'warn', v);
+        try { mediaEl.pause(); mediaEl.currentTime = 0; } catch (_) {}
+      }
+    }
+  } catch (e) {
+    showMessage(`❌ Media check error: ${e.message}`, 'error');
+  }
+}
 
 function loadMqttLib() {
   return new Promise((resolve, reject) => {

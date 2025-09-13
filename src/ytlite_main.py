@@ -160,7 +160,7 @@ class YTLite:
             console.print(f"[green]✓ Video generated: {video_path}[/green]")
             # Generate thumbnail
             thumbnail_path = self.output_dir / "thumbnails" / f"{base_name}.jpg"
-            self.video_generator.create_thumbnail(str(video_path), str(thumbnail_path))
+            self.video_generator.create_thumbnail(str(video_path), str(thumbnail_path), str(audio_path))
             logger.info("Thumbnail created", extra={"thumb": str(thumbnail_path)})
             pr.update("thumbnail", "Thumbnail created", 90, {"thumb": str(thumbnail_path)})
 
