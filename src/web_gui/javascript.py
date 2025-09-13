@@ -11,12 +11,19 @@ def get_javascript_content():
   "use strict";
 
   document.addEventListener('DOMContentLoaded', function() {
+    initLogger();
     loadTheme();
     loadProjects();
   });
 
 // Project view toggle functionality
 let currentProjectView = 'grid';
+let ws = null; // optional raw WebSocket logger
+let wsReady = false;
+let mqttClient = null; // optional MQTT logger
+let mqttReady = false;
+let mqttTopic = 'ytlite/logs';
+let formHandlersAttached = false;
 
 function switchProjectView(view) {
   currentProjectView = view;
@@ -37,6 +44,85 @@ function switchProjectView(view) {
     projectsContainer.style.display = 'block';
     projectsTable.classList.remove('active');
     loadProjects(); // Reload grid view
+  }
+}
+
+// --- Media Preview ---
+async function urlExists(url) {
+  try {
+    const res = await fetch(url, { method: 'HEAD', cache: 'no-store' });
+    return res.ok;
+  } catch (e) {
+    return false;
+  }
+}
+
+async function updateMediaPreview(projectName) {
+  const container = document.getElementById('mediaPreview');
+  const body = document.getElementById('mediaPreviewBody');
+  if (!container || !body) return;
+  container.style.display = 'block';
+  body.innerHTML = '<div>Loading preview…</div>';
+
+  const items = [
+    { key: 'thumb', label: 'Thumbnail', url: `/files/thumbnails/${projectName}.jpg` },
+    { key: 'video', label: 'Video', url: `/files/videos/${projectName}.mp4` },
+    { key: 'audio', label: 'Audio', url: `/files/audio/${projectName}.mp3` },
+    { key: 'svg', label: 'SVG', url: `/files/svg_projects/${projectName}.svg` },
+  ];
+
+  const blocks = [];
+  for (const it of items) {
+    const ok = await urlExists(it.url);
+    if (!ok) continue;
+    if (it.key === 'thumb') {
+      blocks.push(`<div class="media-item"><h4>🖼️ ${it.label}</h4><img class="thumb" src="${it.url}" alt="thumbnail"></div>`);
+    } else if (it.key === 'video') {
+      blocks.push(`<div class="media-item"><h4>🎬 ${it.label}</h4><video class="thumb" src="${it.url}" controls></video></div>`);
+    } else if (it.key === 'audio') {
+      blocks.push(`<div class="media-item"><h4>🔊 ${it.label}</h4><audio src="${it.url}" controls></audio></div>`);
+    } else if (it.key === 'svg') {
+      blocks.push(`<div class="media-item"><h4>📄 ${it.label}</h4><a href="${it.url}" target="_blank" class="btn">Open SVG</a></div>`);
+    }
+  }
+
+  if (blocks.length === 0) {
+    body.innerHTML = `
+      <div>No media files found for this project yet.</div>
+      <button onclick="generateMedia('${projectName}')" class="btn btn-primary" style="margin-top:10px;">
+        🎬 Generate Missing Media
+      </button>
+    `;
+    logEvent(`Media preview: no files found for ${projectName}`, 'warn');
+  } else {
+    body.innerHTML = blocks.join('');
+    logEvent(`Media preview updated for ${projectName}`, 'info', {count: blocks.length});
+  }
+}
+
+// Expose immediately after definition to avoid scope issues
+window.updateMediaPreview = updateMediaPreview;
+
+function loadMqttLib() {
+  return new Promise((resolve, reject) => {
+    if (window.mqtt) return resolve();
+    const s = document.createElement('script');
+    s.src = 'https://unpkg.com/mqtt/dist/mqtt.min.js';
+    s.onload = () => resolve();
+    s.onerror = () => reject(new Error('Failed to load mqtt.js'));
+    document.head.appendChild(s);
+  });
+}
+
+function tryOpenMqtt(url, topic) {
+  try {
+    if (!window.mqtt) throw new Error('mqtt lib not loaded');
+    mqttClient = window.mqtt.connect(url);
+    mqttClient.on('connect', () => { mqttReady = true; logEvent(`MQTT connected to ${url}`, 'info', {topic}); });
+    mqttClient.on('error', () => { mqttReady = false; logEvent('MQTT error (non-fatal)', 'warn'); });
+    mqttClient.on('close', () => { mqttReady = false; logEvent('MQTT closed', 'warn'); });
+  } catch (e) {
+    logEvent('MQTT init failed', 'warn');
   }
 }
 
@@ -69,40 +155,148 @@ function loadTheme() {
   }
 }
 
+// --- Lightweight logging panel and optional WS publisher ---
+function initLogger() {
+  try {
+    // Create log panel
+    if (!document.getElementById('logPanel')) {
+      const panel = document.createElement('div');
+      panel.id = 'logPanel';
+      panel.style.cssText = `
+        position: fixed; bottom: 10px; left: 10px; z-index: 999;
+        width: 420px; max-height: 180px; overflow:auto; font-size: 12px;
+        background: rgba(0,0,0,0.6); color: #fff; padding: 8px 10px; border-radius: 6px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+      `;
+      panel.innerHTML = '<div style="font-weight:600; margin-bottom:4px;">Logs</div><div id="logPanelBody"></div>';
+      document.body.appendChild(panel);
+    }
+
+    // Try to fetch config for optional WS
+    fetch('/api/config').then(r => r.json()).then(cfg => {
+      if (cfg && cfg.mqtt_ws_url) {
+        mqttTopic = cfg.mqtt_ws_topic || 'ytlite/logs';
+        // Try MQTT first (via CDN), then fallback to raw WS if MQTT lib fails
+        loadMqttLib().then(() => {
+          tryOpenMqtt(cfg.mqtt_ws_url, mqttTopic);
+        }).catch(() => {
+          tryOpenWs(cfg.mqtt_ws_url, mqttTopic);
+        });
+      }
+    }).catch(() => {/* ignore */});
+  } catch (e) {
+    console.warn('Logger init failed', e);
+  }
+}
+
+function logEvent(message, level = 'info', context = {}) {
+  const body = document.getElementById('logPanelBody');
+  const ts = new Date().toLocaleTimeString();
+  const line = document.createElement('div');
+  line.textContent = `[${ts}] ${level.toUpperCase()}: ${message}`;
+  body && body.appendChild(line);
+  if (body) body.scrollTop = body.scrollHeight;
+  // try publish to MQTT if connected
+  if (mqttReady && mqttClient) {
+    try {
+      const payload = JSON.stringify({t: Date.now(), level, message, context});
+      mqttClient.publish(mqttTopic, payload);
+    } catch (e) { /* ignore */ }
+  }
+  // else try raw WS if connected
+  if (wsReady && ws) {
+    try {
+      const payload = JSON.stringify({t: Date.now(), level, message, context});
+      ws.send(payload);
+    } catch (e) { /* ignore */ }
+  }
+}
+
+function tryOpenWs(url, topic) {
+  try {
+    ws = new WebSocket(url);
+    ws.onopen = () => { wsReady = true; logEvent(`WS connected to ${url}`, 'info', {topic}); };
+    ws.onerror = (e) => { logEvent('WS error (non-fatal, proceeding without WS)', 'warn'); };
+    ws.onclose = () => { wsReady = false; logEvent('WS closed', 'warn'); };
+  } catch (e) {
+    logEvent('WS init failed', 'warn');
+  }
+}
+
+// Ensure a select element contains a given value; if not, append a temporary option and select it
+function ensureSelectValue(selectId, value) {
+  const sel = document.getElementById(selectId);
+  if (!sel || value == null) return;
+  const strVal = String(value);
+  const existing = Array.from(sel.options).find(o => o.value === strVal);
+  if (!existing) {
+    const opt = document.createElement('option');
+    opt.value = strVal;
+    opt.textContent = strVal;
+    opt.setAttribute('data-custom', '1');
+    sel.appendChild(opt);
+    logEvent(`Added custom option to #${selectId}: ${strVal}`, 'warn');
+  }
+  sel.value = strVal;
+}
+
 // Form management
-function showCreateForm() {
-  // Show create form, hide edit form to avoid confusion
-  const createForm = document.getElementById('createForm');
-  const editForm = document.getElementById('editForm');
-  if (editForm) editForm.style.display = 'none';
-  if (createForm) {
-    createForm.style.display = 'block';
-    createForm.scrollIntoView({behavior: 'smooth'});
+function showProjectForm() {
+  const form = document.getElementById('projectForm');
+  form.style.display = 'block';
+  form.scrollIntoView({behavior: 'smooth'});
+  if (!formHandlersAttached) {
+    const contentEl = document.getElementById('content');
+    contentEl.addEventListener('input', () => {
+      const proj = document.getElementById('project').value.trim();
+      if (proj) {
+        localStorage.setItem(`ytlite:content:${proj}`, contentEl.value);
+      }
+    });
+    formHandlersAttached = true;
   }
 }
 
-function hideCreateForm() {
-  document.getElementById('createForm').style.display = 'none';
+function hideProjectForm() {
+  document.getElementById('projectForm').style.display = 'none';
+  const mp = document.getElementById('mediaPreview');
+  if (mp) mp.style.display = 'none';
 }
 
-function showEditForm() {
-  // Show edit form, hide create form to avoid confusion
-  const editForm = document.getElementById('editForm');
-  const createForm = document.getElementById('createForm');
-  if (createForm) createForm.style.display = 'none';
-  if (editForm) {
-    editForm.style.display = 'block';
-    editForm.scrollIntoView({behavior: 'smooth'});
-  }
+function showFormForCreate() {
+  document.getElementById('form-title').textContent = '📝 Create New Project';
+  document.getElementById('project').readOnly = false;
+  document.getElementById('project').value = '';
+  document.getElementById('content').value = '';
+  document.getElementById('generateBtn').style.display = 'inline-flex';
+  document.getElementById('updateBtn').style.display = 'none';
+  showProjectForm();
+  const mp = document.getElementById('mediaPreview');
+  const mpb = document.getElementById('mediaPreviewBody');
+  if (mp) mp.style.display = 'none';
+  if (mpb) mpb.innerHTML = '';
+  // Set defaults for selects
+  const theme = document.getElementById('theme');
+  const template = document.getElementById('template');
+  const voice = document.getElementById('voice');
+  const fontSize = document.getElementById('font_size');
+  if (theme) theme.value = 'default';
+  if (template) template.value = 'simple';
+  if (voice) voice.value = 'en-US';
+  if (fontSize) fontSize.value = 'medium';
 }
 
-function hideEditForm() {
-  document.getElementById('editForm').style.display = 'none';
+function showFormForEdit() {
+  document.getElementById('form-title').textContent = '✏️ Edit Project';
+  document.getElementById('project').readOnly = true;
+  document.getElementById('generateBtn').style.display = 'none';
+  document.getElementById('updateBtn').style.display = 'inline-flex';
+  showProjectForm();
 }
 
 function selectProject(name) {
-  document.getElementById('project').value = name;
-  showCreateForm();
+  // When a project card is clicked, open the form in edit mode for that project.
+  editProject(name);
 }
 
 // Project loading functions
@@ -256,53 +450,64 @@ async function loadProjectMetadata(projectName) {
 // Project editing functions
 async function editProject(name, evt) {
   if (evt) { evt.preventDefault(); evt.stopPropagation(); }
+  
+  // Show form immediately with loading state
+  showFormForEdit();
+  document.getElementById('project').value = name;
+  document.getElementById('content').value = 'Loading...';
+  window.updateMediaPreview && window.updateMediaPreview(name);
+
   try {
-    // Use single-project metadata endpoint for consistent behavior
     const res = await fetch(`/api/svg_metadata?project=${name}`);
     if (res.ok) {
       const data = await res.json();
-      const metaData = data.metadata || data; // handle both formats
-      populateEditForm(name, metaData);
-      showEditForm();
+      const metaData = data.metadata || data;
+      logEvent(`Loaded metadata for ${name}`, 'info', {fields: Object.keys(metaData || {})});
+      populateProjectForm(name, metaData);
+      const contentEl = document.getElementById('content');
+      // Fallback if content still missing
+      if (!contentEl.value || contentEl.value === 'Loading...') {
+        await fetchProjectMarkdown(name);
+      }
+      // Refresh preview just in case files changed
+      window.updateMediaPreview && window.updateMediaPreview(name);
+    } else {
+        document.getElementById('content').value = 'Error: Failed to load project data.';
+        showMessage('Failed to load project metadata', 'error');
     }
   } catch (e) {
     console.error('Failed to load project metadata:', e);
+    document.getElementById('content').value = 'Error: Failed to load project data.';
     showMessage('Failed to load project metadata', 'error');
   }
 }
 
-async function editSVGProject(name, evt) {
-  if (evt) { evt.preventDefault(); evt.stopPropagation(); }
-  try {
-    const res = await fetch(`/api/svg_metadata?project=${name}`);
-    if (res.ok) {
-      const data = await res.json();
-      const meta = data.metadata || {};
-      populateEditForm(name, meta);
-      showEditForm();
+// editSVGProject is now an alias for editProject
+const editSVGProject = editProject;
+
+function populateProjectForm(name, meta) {
+  document.getElementById('project').value = name;
+  
+  const candidate = meta.markdown_content || meta.markdown || meta.content || meta.description;
+  if (candidate && String(candidate).trim().length > 0) {
+    document.getElementById('content').value = candidate;
+    localStorage.setItem(`ytlite:content:${name}`, candidate);
+    logEvent(`Content loaded from metadata for ${name} (${candidate.length} chars)`, 'info');
+  } else {
+    // Try cached content
+    const cached = localStorage.getItem(`ytlite:content:${name}`) || '';
+    if (cached) {
+      document.getElementById('content').value = cached;
+      logEvent(`Content restored from cache for ${name} (${cached.length} chars)`, 'warn');
+    } else {
+      logEvent(`No content found in metadata for ${name}`, 'warn', {available: Object.keys(meta)});
     }
-  } catch (e) {
-    console.error('Failed to load SVG project metadata:', e);
-    showMessage('Failed to load project metadata', 'error');
-  }
-}
-
-function populateEditForm(name, meta) {
-  document.getElementById('editProject').value = name;
-  
-  // Try multiple possible field names for content
-  const content = meta.markdown_content || meta.markdown || meta.content || meta.description || '';
-  document.getElementById('editContent').value = content;
-  
-  // Debug logging to help identify missing content
-  if (!content) {
-    console.warn('No content found for project', name, 'Available meta fields:', Object.keys(meta));
   }
   
-  if (meta.voice) document.getElementById('editVoice').value = meta.voice;
-  if (meta.theme) document.getElementById('editTheme').value = meta.theme;
-  if (meta.template) document.getElementById('editTemplate').value = meta.template;
-  if (meta.font_size) document.getElementById('editFontSize').value = meta.font_size;
+  if (meta.voice) ensureSelectValue('voice', meta.voice);
+  if (meta.theme) ensureSelectValue('theme', meta.theme);
+  if (meta.template) ensureSelectValue('template', meta.template);
+  if (meta.font_size) ensureSelectValue('font_size', meta.font_size);
 }
 
 // Field validation
@@ -400,14 +605,23 @@ async function generateProject() {
   if (font_size) formData.append('font_size', font_size);
   
   showMessage('🚀 Generating project...', 'info');
+  logEvent(`Generate start for ${project}`, 'info');
   
   try {
     const res = await fetch('/api/generate', { method: 'POST', body: formData });
     const data = await res.json();
     
     if (res.ok) {
-      showMessage(`✅ Project "${project}" generated successfully`, 'success');
-      hideCreateForm();
+      let successMsg = `✅ Project "${project}" generated successfully.`;
+      if (data.validation && data.validation.message) {
+        successMsg += ` ${data.validation.message}`;
+      }
+      showMessage(successMsg, data.validation && data.validation.valid ? 'success' : 'warning');
+      localStorage.setItem(`ytlite:content:${project}`, content);
+      logEvent(`Generate done for ${project}`, 'success', {validation: data.validation || null});
+      // Refresh media preview to show new files
+      window.updateMediaPreview && window.updateMediaPreview(project);
+      hideProjectForm();
       await loadProjects();
     } else {
       // Check if server returned validation errors
@@ -415,77 +629,32 @@ async function generateProject() {
         showValidationErrors(data.validation_errors);
       }
       showMessage(`❌ Generation failed: ${data.message || data.error}`, 'error');
+      logEvent(`Generate failed for ${project}: ${data.message || data.error}`, 'error');
     }
   } catch (e) {
     showMessage(`❌ Generation error: ${e.message}`, 'error');
+    logEvent(`Generate error for ${project}: ${e.message}`, 'error');
   }
 }
 
-// Edit form validation
-function validateEditField(fieldName) {
-  const field = document.getElementById(fieldName);
-  const errorDiv = document.getElementById(fieldName + '-error');
-  const value = field.value.trim();
-  
-  let isValid = true;
-  let errorMessage = '';
-  
-  switch (fieldName) {
-    case 'editContent':
-      if (!value) {
-        isValid = false;
-        errorMessage = 'Content is required';
-      } else if (value.length < 10) {
-        isValid = false;
-        errorMessage = 'Content must be at least 10 characters long';
-      }
-      break;
-  }
-  
-  if (isValid) {
-    field.parentNode.classList.remove('error');
-    errorDiv.classList.remove('show');
-    errorDiv.textContent = '';
-  } else {
-    field.parentNode.classList.add('error');
-    errorDiv.classList.add('show');
-    errorDiv.textContent = errorMessage;
-  }
-  
-  return isValid;
-}
-
-function validateEditForm() {
-  const contentValid = validateEditField('editContent');
-  return contentValid;
-}
-
-function showEditValidationErrors(errors) {
-  const errorsDiv = document.getElementById('editValidationErrors');
-  if (errors && errors.length > 0) {
-    errorsDiv.innerHTML = '<strong>Please fix these errors:</strong><ul>' + 
-      errors.map(error => `<li>${error}</li>`).join('') + '</ul>';
-    errorsDiv.style.display = 'block';
-  } else {
-    errorsDiv.style.display = 'none';
-  }
-}
 
 async function updateProject() {
-  const project = document.getElementById('editProject').value.trim();
-  const content = document.getElementById('editContent').value;
-  const voice = document.getElementById('editVoice').value;
-  const theme = document.getElementById('editTheme').value;
-  const template = document.getElementById('editTemplate').value;
-  const font_size = document.getElementById('editFontSize').value;
+  // This function now reads from the main unified form
+  const project = document.getElementById('project').value.trim();
+  const content = document.getElementById('content').value;
+  const voice = document.getElementById('voice').value;
+  const theme = document.getElementById('theme').value;
+  const template = document.getElementById('template').value;
+  const font_size = document.getElementById('font_size').value;
+  const force_regenerate = document.getElementById('force_regenerate').checked;
   
   if (!project) return;
   
   // Clear previous errors
-  showEditValidationErrors([]);
-  
-  // Validate edit form
-  if (!validateEditForm()) {
+  showValidationErrors([]);
+
+  // Re-use the main validation logic
+  if (!validateAllFields()) {
     showMessage('Please fix the validation errors before updating', 'error');
     return;
   }
@@ -497,26 +666,91 @@ async function updateProject() {
   formData.append('theme', theme);
   formData.append('template', template);
   if (font_size) formData.append('font_size', font_size);
+  formData.append('force_regenerate', force_regenerate);
   
   showMessage('💾 Updating project...', 'info');
+  logEvent(`Update start for ${project}`, 'info');
   
   try {
     const res = await fetch('/api/generate', { method: 'POST', body: formData });
     const data = await res.json();
     
     if (res.ok) {
-      showMessage(`✅ Project "${project}" updated successfully`, 'success');
-      hideEditForm();
+      let successMsg = `✅ Project "${project}" updated successfully.`;
+      if (data.validation && data.validation.message) {
+        successMsg += ` ${data.validation.message}`;
+      }
+      showMessage(successMsg, data.validation && data.validation.valid ? 'success' : 'warning');
+      localStorage.setItem(`ytlite:content:${project}`, content);
+      logEvent(`Update done for ${project}`, 'success', {validation: data.validation || null});
+      // Refresh media preview to show new files
+      window.updateMediaPreview && window.updateMediaPreview(project);
+      hideProjectForm();
       await loadProjects();
     } else {
       // Check if server returned validation errors
       if (data.validation_errors) {
-        showEditValidationErrors(data.validation_errors);
+        showValidationErrors(data.validation_errors);
       }
       showMessage(`❌ Update failed: ${data.message || data.error}`, 'error');
+      logEvent(`Update failed for ${project}: ${data.message || data.error}`, 'error');
     }
   } catch (e) {
     showMessage(`❌ Update error: ${e.message}`, 'error');
+    logEvent(`Update error for ${project}: ${e.message}`, 'error');
+  }
+}
+
+async function fetchProjectMarkdown(name) {
+  try {
+    // Try primary .md then fallback to description.md
+    const tryPaths = [
+      `/files/projects/${name}/${name}.md`,
+      `/files/projects/${name}/description.md`
+    ];
+    for (const p of tryPaths) {
+      const res = await fetch(p);
+      if (res.ok) {
+        const text = await res.text();
+        if (text && text.trim().length > 0) {
+          document.getElementById('content').value = text;
+          localStorage.setItem(`ytlite:content:${name}`, text);
+          logEvent(`Content loaded from ${p} for ${name} (${text.length} chars)`, 'info');
+          return true;
+        }
+      }
+    }
+    logEvent(`No markdown file found for ${name}`, 'warn');
+    return false;
+  } catch (e) {
+    logEvent(`Failed to fetch markdown for ${name}: ${e.message}`, 'error');
+    return false;
+  }
+}
+
+async function generateMedia(projectName) {
+  if (!projectName) return;
+  showMessage(`🎬 Generating media for ${projectName}...`, 'info');
+  logEvent(`Media generation start for ${projectName}`, 'info');
+  try {
+    const res = await fetch('/api/generate_media', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ project: projectName })
+    });
+    const data = await res.json();
+    if (res.ok) {
+      showMessage(`✅ Media for "${projectName}" generated successfully.`, 'success');
+      logEvent(`Media generation done for ${projectName}`, 'success', { files: data.files_generated });
+      // Refresh the preview to show the new files
+      updateMediaPreview(projectName);
+    } else {
+      showMessage(`❌ Media generation failed: ${data.message || data.error}`, 'error');
+      logEvent(`Media generation failed for ${projectName}: ${data.message || data.error}`, 'error');
+    }
+  } catch (e) {
+    showMessage(`❌ Media generation error: ${e.message}`, 'error');
+    logEvent(`Media generation error for ${projectName}: ${e.message}`, 'error');
   }
 }
 
@@ -807,6 +1041,8 @@ function showMessage(text, type = 'info') {
   `;
   
   document.body.appendChild(msgDiv);
+  // Also pipe to log panel
+  logEvent(text, type);
   
   // Auto-remove after 3 seconds
   setTimeout(() => {
@@ -819,13 +1055,9 @@ function showMessage(text, type = 'info') {
   // Attach functions to window object to make them accessible from HTML
   window.toggleTheme = toggleTheme;
   window.switchProjectView = switchProjectView;
-  window.showCreateForm = showCreateForm;
-  window.hideCreateForm = hideCreateForm;
-  window.showEditForm = showEditForm;
-  window.hideEditForm = hideEditForm;
+  window.showFormForCreate = showFormForCreate;
+  window.hideProjectForm = hideProjectForm;
   window.generateProject = generateProject;
-  window.editSVGProject = editSVGProject;
-  window.editProject = editProject;
   window.updateProject = updateProject;
   window.deleteProject = deleteProject;
   window.validateProject = validateProject;
@@ -835,6 +1067,12 @@ function showMessage(text, type = 'info') {
   window.restoreVersion = restoreVersion;
   window.openSVGWithAutoplay = openSVGWithAutoplay;
   window.selectProject = selectProject;
+  // Expose validators and edit handlers used by inline HTML attributes
+  window.validateField = validateField;
+  window.validateAllFields = validateAllFields;
+  window.editProject = editProject;
+  window.editSVGProject = editSVGProject;
+  window.generateMedia = generateMedia;
 
 })();
 """

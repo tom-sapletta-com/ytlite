@@ -226,6 +226,34 @@ INDEX_HTML = """
       border-radius: 8px;
     }
 
+    /* Media preview */
+    .media-preview {
+      margin-top: 16px;
+      padding-top: 12px;
+      border-top: 1px solid var(--border-color);
+    }
+    .media-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 16px;
+      margin-top: 12px;
+    }
+    .media-item {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 10px;
+    }
+    .media-item h4 {
+      margin: 0 0 8px 0;
+      font-size: 14px;
+    }
+    .media-item .thumb {
+      max-width: 100%;
+      border-radius: 6px;
+      display: block;
+    }
+
     .validation-status {
       display: inline-flex;
       align-items: center;
@@ -441,10 +469,10 @@ INDEX_HTML = """
   </div>
 
   <div class="box">
-    <h2>📝 Create New Project</h2>
-    <button onclick="showCreateForm()" class="btn btn-primary">+ New Project</button>
+    <h2 id="form-title">📝 Create or Edit Project</h2>
+    <button onclick="showFormForCreate()" class="btn btn-primary">+ New Project</button>
     
-    <div id="createForm">
+    <div id="projectForm" style="display: none;">
       <div id="validationErrors" class="validation-errors" style="display: none;"></div>
       
       <label for="project">Project Name:</label>
@@ -515,10 +543,24 @@ This is my content with **markdown** support.
         </div>
       </div>
       
-      <div class="form-actions">
-        <button onclick="hideCreateForm()" class="btn">Cancel</button>
-        <button onclick="generateProject()" class="btn btn-primary">🚀 Generate Project</button>
+      <div class="form-field" style="margin-top: 16px;">
+        <label for="force_regenerate" style="display: inline-flex; align-items: center; gap: 8px;">
+          <input type="checkbox" id="force_regenerate" name="force_regenerate" style="width: auto;">
+          Force media re-generation (audio, video, thumbnail)
+        </label>
       </div>
+      
+      <div class="form-actions">
+        <button onclick="hideProjectForm()" class="btn">Cancel</button>
+        <button id="generateBtn" onclick="generateProject()" class="btn btn-primary">🚀 Generate Project</button>
+        <button id="updateBtn" onclick="updateProject()" class="btn btn-primary" style="display: none;">💾 Update Project</button>
+      </div>
+    </div>
+
+    <!-- Media preview for current project -->
+    <div id="mediaPreview" class="media-preview" style="display: none;">
+      <h3>🎞️ Media Preview</h3>
+      <div id="mediaPreviewBody" class="media-grid"></div>
     </div>
   </div>
 
@@ -547,67 +589,6 @@ This is my content with **markdown** support.
     </div>
   </div>
 
-  <div id="editForm" class="box">
-    <h2>✏️ Edit Project</h2>
-    <div id="editValidationErrors" class="validation-errors" style="display: none;"></div>
-    
-    <label for="editProject">Project Name:</label>
-    <input type="text" id="editProject" name="editProject" readonly>
-    
-    <label for="editContent">Content (Markdown):</label>
-    <textarea id="editContent" name="editContent" onblur="validateEditField('editContent')"></textarea>
-    <div id="editContent-error" class="field-error"></div>
-    
-    <div class="row">
-      <div class="col">
-        <label for="editTheme">Theme:</label>
-        <select id="editTheme" name="editTheme">
-          <option value="default">Default</option>
-          <option value="dark">Dark</option>
-          <option value="blue">Blue</option>
-          <option value="green">Green</option>
-        </select>
-      </div>
-      <div class="col">
-        <label for="editTemplate">Template:</label>
-        <select id="editTemplate" name="editTemplate">
-          <option value="simple">Simple</option>
-          <option value="modern">Modern</option>
-          <option value="minimal">Minimal</option>
-          <option value="corporate">Corporate</option>
-        </select>
-      </div>
-    </div>
-    
-    <div class="row">
-      <div class="col">
-        <label for="editVoice">Voice:</label>
-        <select id="editVoice" name="editVoice">
-          <option value="en-US">English (US)</option>
-          <option value="en-GB">English (UK)</option>
-          <option value="es-ES">Spanish</option>
-          <option value="fr-FR">French</option>
-          <option value="de-DE">German</option>
-          <option value="it-IT">Italian</option>
-          <option value="pl-PL">Polish</option>
-        </select>
-      </div>
-      <div class="col">
-        <label for="editFontSize">Font Size:</label>
-        <select id="editFontSize" name="editFontSize">
-          <option value="small">Small</option>
-          <option value="medium">Medium</option>
-          <option value="large">Large</option>
-          <option value="xl">Extra Large</option>
-        </select>
-      </div>
-    </div>
-    
-    <div class="form-actions">
-      <button onclick="hideEditForm()" class="btn">Cancel</button>
-      <button onclick="updateProject()" class="btn btn-primary">💾 Update Project</button>
-    </div>
-  </div>
 
   <script src="/static/js/web_gui.js"></script>
 </body>

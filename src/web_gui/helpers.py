@@ -5,13 +5,52 @@ Helper functions for the Web GUI to avoid circular dependencies.
 
 from pathlib import Path
 from typing import Dict, Any, Optional
+import shutil
 
 from logging_setup import get_logger
 
 logger = get_logger("web_gui.helpers")
 
+def generate_missing_media(project_name: str, output_dir: Path) -> tuple[bool, list[str], str]:
+    """Generate audio, video, and thumbnail if they don't exist."""
+    from ytlite_main import YTLite
+
+    project_dir = output_dir / 'projects' / project_name
+    if not project_dir.exists():
+        return False, [], f"Project directory {project_dir} not found."
+
+    # Use description.md or the primary .md file as the source
+    md_file = project_dir / f"{project_name}.md"
+    if not md_file.exists():
+        md_file = project_dir / 'description.md'
+    
+    if not md_file.exists():
+        return False, [], f"No markdown file found in {project_dir}."
+
+    ytl = YTLite(output_dir=str(output_dir), project_name=project_name)
+    generated_files = []
+    try:
+        # YTLite's main method handles the logic of checking existence before generating
+        # We can call it to ensure all media is present
+        # The main method should handle not re-generating existing files
+        ytl.main(markdown_path=str(md_file))
+        
+        # Verify which files were actually created or already existed
+        if ytl.audio_path and Path(ytl.audio_path).exists():
+            generated_files.append(ytl.audio_path)
+        if ytl.video_path and Path(ytl.video_path).exists():
+            generated_files.append(ytl.video_path)
+        if ytl.thumb_path and Path(ytl.thumb_path).exists():
+            generated_files.append(ytl.thumb_path)
+
+        return True, generated_files, ""
+
+    except Exception as e:
+        logger.error(f"Error generating media for {project_name}: {e}")
+        return False, [], str(e)
+
 def create_svg_project(project_name: str, content: str, metadata: Dict[str, Any] = None,
-                      output_path: Path = None) -> Optional[Path]:
+                      output_path: Path = None, force_regenerate: bool = False) -> Optional[Path]:
     """Create a single SVG project file with embedded media."""
     
     from ytlite_main import YTLite
@@ -28,6 +67,23 @@ def create_svg_project(project_name: str, content: str, metadata: Dict[str, Any]
     try:
         # Use YTLite to generate the necessary files from content
         logger.info(f"Running YTLite to generate media for {project_name}")
+        if force_regenerate:
+            logger.info(f"Force regenerate enabled for {project_name}. Deleting existing media.")
+            # Correctly reference the base 'output' directory from the svg_projects path
+            base_output_dir = output_path.parent.parent 
+            media_files = [
+                base_output_dir / 'audio' / f"{project_name}.mp3",
+                base_output_dir / 'videos' / f"{project_name}.mp4",
+                base_output_dir / 'thumbnails' / f"{project_name}.jpg"
+            ]
+            for f in media_files:
+                if f.exists():
+                    try:
+                        f.unlink()
+                        logger.info(f"Deleted {f}")
+                    except OSError as e:
+                        logger.error(f"Error deleting {f}: {e}")
+
         ytlite = YTLite(output_dir=str(output_path.parent.parent), project_name=project_name)
         
         # Create a temporary markdown file for YTLite to process
@@ -39,25 +95,52 @@ def create_svg_project(project_name: str, content: str, metadata: Dict[str, Any]
         # Generate the video and audio
         ytlite.generate_video(str(md_file))
         
-        # Define paths to generated files
-        video_path = project_dir / f"{project_name}.mp4"
-        audio_path = project_dir / f"{project_name}.mp3"
-        thumbnail_path = project_dir / 'thumbnail.jpg'
+        # Resolve centralized output directories
+        base_output_dir = output_path.parent.parent
+        videos_dir = base_output_dir / 'videos'
+        audio_dir = base_output_dir / 'audio'
+        thumbs_dir = base_output_dir / 'thumbnails'
+
+        # Resolve paths to generated files (prefer centralized dirs, fallback to project dir)
+        video_path = videos_dir / f"{project_name}.mp4"
+        if not video_path.exists():
+            video_path = project_dir / f"{project_name}.mp4"
+
+        audio_path = audio_dir / f"{project_name}.mp3"
+        if not audio_path.exists():
+            audio_path = project_dir / f"{project_name}.mp3"
+
+        thumbnail_path = thumbs_dir / f"{project_name}.jpg"
+        if not thumbnail_path.exists():
+            thumbnail_path = project_dir / 'thumbnail.jpg'
 
         if not video_path.exists():
             logger.error(f"Video file not generated for {project_name} at {video_path}")
             return None
 
+        # If YTLite already produced a packaged SVG in the project directory, reuse it
+        packaged_svg = project_dir / f"{project_name}.svg"
+        if packaged_svg.exists():
+            try:
+                shutil.copyfile(str(packaged_svg), str(output_path))
+                logger.info(f"Copied packaged SVG to {output_path}")
+                return output_path
+            except Exception as copy_err:
+                logger.warning(f"Failed to copy packaged SVG, will repackage: {copy_err}")
+
         # Create packager and generate SVG
         packager = SVGDataURIPackager()
         svg_content = packager.create_svg_project(
-            project_name, metadata, video_path, audio_path, 
-            thumbnail_path if thumbnail_path.exists() else None
+            project_name,
+            metadata,
+            video_path,
+            audio_path if audio_path.exists() else None,
+            thumbnail_path if thumbnail_path.exists() else None,
         )
-        
+
         # Save SVG file
         output_path.write_text(svg_content, encoding='utf-8')
-        
+
         logger.info(f"Created SVG project: {output_path}")
         return output_path
 

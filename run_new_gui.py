@@ -12,7 +12,7 @@ os.environ['YTLITE_FAST_TEST'] = '1'
 
 # Direct imports and app creation
 from flask import Flask
-from web_gui.templates import get_html_template
+from web_gui.templates import INDEX_HTML
 from web_gui.javascript import get_javascript_content  
 from web_gui.routes import setup_routes
 

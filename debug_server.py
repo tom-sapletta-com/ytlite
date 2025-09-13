@@ -9,6 +9,10 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
 src_dir = os.path.join(current_dir, 'src')
 sys.path.insert(0, src_dir)
 
+log_file = open('debug_server_log.txt', 'w')
+sys.stdout = log_file
+sys.stderr = log_file
+
 print(f"Starting debug server...")
 print(f"Current dir: {current_dir}")
 print(f"Src dir: {src_dir}")
@@ -17,7 +21,7 @@ try:
     from flask import Flask, jsonify, request
     print("Flask imported successfully")
     
-    from web_gui.templates import get_html_template
+    from web_gui.templates import INDEX_HTML
     print("Templates imported successfully")
     
     from web_gui.javascript import get_javascript_content  
@@ -28,7 +32,7 @@ try:
     @app.route('/')
     def index():
         print("Serving index page")
-        return get_html_template()
+        return INDEX_HTML
     
     @app.route('/main.js')
     def main_js():
@@ -110,3 +114,5 @@ except Exception as e:
     print(f"Error: {e}")
     import traceback
     traceback.print_exc()
+finally:
+    log_file.close()

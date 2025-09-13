@@ -18,6 +18,7 @@ import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 from logging_setup import get_logger
+from . import helpers
 
 logger = get_logger("web_gui.routes")
 
@@ -48,6 +49,19 @@ def setup_routes(app: Flask, base_dir: Path, output_dir: Path):
         """Health check endpoint."""
         return '', 204
 
+    @app.route('/api/config')
+    def api_config():
+        """Return frontend config such as MQTT WebSocket settings (optional)."""
+        try:
+            cfg = {
+                'mqtt_ws_url': os.environ.get('MQTT_WS_URL') or os.environ.get('MQTT_WS') or '',
+                'mqtt_ws_topic': os.environ.get('MQTT_WS_TOPIC', 'ytlite/logs')
+            }
+            return jsonify(cfg)
+        except Exception:
+            # Be permissive; return empty config on error
+            return jsonify({'mqtt_ws_url': '', 'mqtt_ws_topic': 'ytlite/logs'})
+
     @app.route('/favicon.ico')
     def favicon():
         """Handle favicon requests"""
@@ -57,8 +71,17 @@ def setup_routes(app: Flask, base_dir: Path, output_dir: Path):
     def serve_javascript():
         """Serve the JavaScript content."""
         try:
-            from . import javascript
-            return javascript.get_javascript_content(), 200, {'Content-Type': 'application/javascript'}
+            from . import javascript as _js
+            try:
+                import importlib
+                _js = importlib.reload(_js)
+            except Exception:
+                pass
+            return _js.get_javascript_content(), 200, {
+                'Content-Type': 'application/javascript',
+                'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
+                'Pragma': 'no-cache'
+            }
         except ImportError:
             logger.error("Failed to import get_javascript_content from web_gui.javascript")
             return "// Error: JavaScript content not available", 200, {'Content-Type': 'application/javascript'}
@@ -120,6 +143,29 @@ def setup_routes(app: Flask, base_dir: Path, output_dir: Path):
             logger.error(f"Error serving file {filepath}: {e}")
             return 'Server error', 500
 
+    @app.route('/api/generate_media', methods=['POST'])
+    def api_generate_media():
+        """Generate missing media files (audio, video, thumb) for a project."""
+        data = request.get_json()
+        project_name = data.get('project')
+
+        if not project_name:
+            return jsonify({'error': 'Missing project name'}), 400
+
+        try:
+            from . import helpers
+            success, generated_files, error = helpers.generate_missing_media(project_name, output_dir)
+            
+            if success:
+                return jsonify({'message': 'Media generated successfully', 'files_generated': generated_files}), 200
+            else:
+                logger.error(f"Failed to generate media for {project_name}: {error}")
+                return jsonify({'error': f'Failed to generate media: {error}'}), 500
+
+        except Exception as e:
+            logger.error(f"Error in /api/generate_media for {project_name}: {e}")
+            return jsonify({'error': 'An unexpected error occurred'}), 500
+
     @app.route('/api/generate', methods=['POST'])
     def api_generate():
         """Generate a new project or update existing one."""
@@ -128,6 +174,7 @@ def setup_routes(app: Flask, base_dir: Path, output_dir: Path):
             data = request.form.to_dict()
             logger.debug(f"Request form data: {data}")
             project = data.get('project', '').strip()
+            force_regenerate = data.get('force_regenerate', 'false').lower() == 'true'
             if not project:
                 logger.error("Missing project name in request")
                 return jsonify({'message': 'Missing project name'}), 400
@@ -160,6 +207,8 @@ def setup_routes(app: Flask, base_dir: Path, output_dir: Path):
                 'created': datetime.now().isoformat()
             }
 
+            force_regenerate = data.get('force_regenerate', False)
+
             # Create SVG project using new architecture
             svg_file = output_dir / 'svg_projects' / f"{project}.svg"
             svg_file.parent.mkdir(parents=True, exist_ok=True)
@@ -168,37 +217,50 @@ def setup_routes(app: Flask, base_dir: Path, output_dir: Path):
                 logger.info(f"Starting SVG project creation for {project}")
                 logger.debug(f"Metadata: {metadata}")
                 
-                result = create_svg_project(
+                # Determine if it's a create or update operation based on whether the project dir exists
+                project_dir = output_dir / 'projects' / project
+                is_update = project_dir.exists()
+
+                # Create/update SVG project
+                svg_path = helpers.create_svg_project(
                     project_name=project,
                     content=data.get('markdown', ''),
-                    metadata=metadata,
-                    output_path=svg_file
+                    metadata=data,
+                    output_path=output_dir,
+                    force_regenerate=force_regenerate
                 )
                 
-                if result:
+                if svg_path:
                     logger.info(f"✅ SVG project creation successful for {project}")
-                    logger.info(f"   📄 SVG file: {svg_file}")
-                    logger.info(f"   📏 File size: {svg_file.stat().st_size if svg_file.exists() else 'Unknown'} bytes")
                     
-                    # Log embedded media information
+                    # Post-generation validation
+                    validation_status = {'valid': False, 'message': 'Validation failed'}
                     try:
-                        svg_content = svg_file.read_text()
-                        video_count = svg_content.count('data:video')
-                        audio_count = svg_content.count('data:audio')
-                        image_count = svg_content.count('data:image')
-                        
-                        if video_count > 0 or audio_count > 0 or image_count > 0:
-                            logger.info(f"   📎 Embedded media - Videos: {video_count}, Audio: {audio_count}, Images: {image_count}")
+                        from svg_packager import parse_svg_meta
+                        svg_meta = parse_svg_meta(svg_file)
+                        if svg_meta:
+                            validation_status['valid'] = True
+                            validation_status['message'] = 'SVG is well-formed.'
+                            
+                            # Check for embedded media
+                            svg_content = svg_file.read_text(encoding='utf-8')
+                            has_audio = 'data:audio' in svg_content
+                            if has_audio:
+                                validation_status['message'] += ' Contains embedded audio.'
+                            else:
+                                validation_status['message'] += ' No embedded audio found.'
                         else:
-                            logger.info(f"   📎 No embedded media found")
-                    except Exception as media_log_error:
-                        logger.warning(f"Could not analyze embedded media: {media_log_error}")
-                    
+                            validation_status['message'] = 'SVG appears to be corrupt or empty.'
+                    except Exception as val_err:
+                        logger.error(f"Validation error for {project}: {val_err}")
+                        validation_status['message'] = f"Validation failed: {val_err}"
+
                     return jsonify({
-                        'message': f'Project "{project}" generated successfully',
+                        'message': f'Project "{project}" generated successfully.',
                         'project': project,
                         'svg_file': f"svg_projects/{project}.svg",
-                        'type': 'svg'
+                        'type': 'svg',
+                        'validation': validation_status
                     })
                 else:
                     logger.error(f"❌ SVG project creation failed for {project} - create_svg_project returned False")
@@ -420,27 +482,68 @@ def setup_routes(app: Flask, base_dir: Path, output_dir: Path):
 
     @app.route('/api/svg_metadata')
     def api_svg_metadata():
-        """Get metadata from SVG project file."""
+        """Get metadata for a project, supporting both SVG and directory types."""
         project = request.args.get('project', '').strip()
         if not project:
             return jsonify({'error': 'Missing project parameter'}), 400
-        
+
         try:
+            # Check for SVG project first
             svg_file = output_dir / 'svg_projects' / f"{project}.svg"
-            if not svg_file.exists():
-                return jsonify({'error': 'SVG project not found'}), 404
-            
-            from svg_packager import parse_svg_meta
-            metadata = parse_svg_meta(svg_file)
-            
-            return jsonify({
-                'project': project,
-                'metadata': metadata or {},
-                'svg_file': f"svg_projects/{project}.svg"
-            })
+            if svg_file.exists():
+                from svg_packager import parse_svg_meta
+                metadata = parse_svg_meta(svg_file) or {}
+
+                # Try to include original markdown content if it exists
+                proj_dir = output_dir / 'projects' / project
+                md_primary = proj_dir / f"{project}.md"
+                desc_fallback = proj_dir / 'description.md'
+                try:
+                    if md_primary.exists():
+                        metadata['markdown_content'] = md_primary.read_text(encoding='utf-8')
+                    elif desc_fallback.exists():
+                        metadata['markdown_content'] = desc_fallback.read_text(encoding='utf-8')
+                except Exception as _e:
+                    logger.warning(f"Could not read markdown for {project}: {_e}")
+                
+                return jsonify({
+                    'project': project,
+                    'metadata': metadata,
+                    'svg_file': f"svg_projects/{project}.svg"
+                })
+
+            # Check for directory-based project
+            project_dir = output_dir / 'projects' / project
+            md_primary = project_dir / f"{project}.md"
+            desc_file = project_dir / 'description.md'
+            target_md = md_primary if md_primary.exists() else desc_file
+            if target_md.exists():
+                content = target_md.read_text(encoding='utf-8')
+                metadata = {'markdown_content': content}
+                # Try to parse frontmatter for theme/template/voice/font_size/lang
+                try:
+                    import frontmatter
+                    fm = frontmatter.loads(content)
+                    meta_dict = fm.get('meta') or {}
+                    # Direct fields or under 'meta'
+                    metadata['theme'] = fm.get('theme') or meta_dict.get('theme')
+                    metadata['template'] = fm.get('template') or meta_dict.get('template')
+                    metadata['voice'] = fm.get('voice') or meta_dict.get('voice')
+                    metadata['font_size'] = fm.get('font_size') or fm.get('fontSize') or meta_dict.get('font_size')
+                    metadata['lang'] = fm.get('lang') or fm.get('language') or meta_dict.get('lang')
+                except Exception as _e:
+                    logger.warning(f"Frontmatter parse failed for {project}: {_e}")
+
+                return jsonify({
+                    'project': project,
+                    'metadata': metadata
+                })
+
+            return jsonify({'error': 'Project not found'}), 404
+
         except Exception as e:
-            logger.error(f"Failed to get SVG metadata for {project}: {e}")
-            return jsonify({'error': 'Failed to read SVG metadata'}), 500
+            logger.error(f"Failed to get metadata for {project}: {e}")
+            return jsonify({'error': 'Failed to read project metadata'}), 500
 
     @app.route('/api/delete_project', methods=['POST'])
     def api_delete_project():
