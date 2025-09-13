@@ -361,10 +361,27 @@ class VideoGenerator:
                     clip.close()
             except Exception:
                 pass
-        # Overlay audio waveform on the bottom 20% of the image
+        # Overlay audio waveform on the bottom part of the image (configurable)
         if img is not None:
             try:
-                overlay_h = max(10, int(img.height * 0.20))
+                # Read config for waveform rendering
+                wf_cfg = (self.config.get("thumbnail") or {}).get("waveform", {})
+                height_ratio = float(wf_cfg.get("height_ratio", 0.20))
+                # Colors from config (hex + alpha)
+                def _rgba(hexstr: str, alpha: int) -> tuple[int, int, int, int]:
+                    r, g, b = self._parse_hex(hexstr)
+                    a = max(0, min(255, int(alpha)))
+                    return (r, g, b, a)
+                wave_color = _rgba(wf_cfg.get("color", "#00ff88"), int(wf_cfg.get("alpha", 180)))
+                bg_rgba = _rgba(wf_cfg.get("bg_color", "#000000"), int(wf_cfg.get("bg_alpha", 120)))
+                axes_color = _rgba(wf_cfg.get("axes_color", "#ffffff"), int(wf_cfg.get("axes_alpha", 80)))
+                baseline_color = _rgba(wf_cfg.get("baseline_color", "#ffffff"), int(wf_cfg.get("baseline_alpha", 160)))
+                show_axes = bool(wf_cfg.get("show_axes", True))
+                time_tick_seconds = max(1, int(wf_cfg.get("time_tick_seconds", 10)))
+                level_tick_count = max(0, int(wf_cfg.get("level_tick_count", 4)))
+                baseline_width = max(1, int(wf_cfg.get("baseline_width", 2)))
+
+                overlay_h = max(10, int(img.height * height_ratio))
                 wave_top = img.height - overlay_h
                 baseline_y = wave_top + overlay_h // 2
 
@@ -372,20 +389,21 @@ class VideoGenerator:
                 overlay = Image.new('RGBA', img.size, (0, 0, 0, 0))
                 odraw = ImageDraw.Draw(overlay)
                 # Semi-transparent background for the waveform strip
-                odraw.rectangle([0, wave_top, img.width, img.height], fill=(0, 0, 0, 120))
+                odraw.rectangle([0, wave_top, img.width, img.height], fill=bg_rgba)
 
                 drew_waveform = False
+                audio_duration = None
                 if audio_path and os.path.exists(audio_path):
                     audio = None
                     try:
                         audio = AudioFileClip(audio_path)
-                        duration = float(audio.duration or 0.0)
-                        if duration > 0:
+                        audio_duration = float(audio.duration or 0.0)
+                        if audio_duration > 0:
                             width = img.width
                             # Sample amplitude at evenly spaced times across the track
                             amps = []
                             for x in range(width):
-                                t = (x + 0.5) / width * duration
+                                t = (x + 0.5) / width * audio_duration
                                 try:
                                     sample = audio.get_frame(t)
                                     # sample can be scalar or array-like (channels)
@@ -404,10 +422,9 @@ class VideoGenerator:
                                 ref = srt[idx] if srt else 1.0
                                 ref = max(ref, max(amps), 1e-6)
                                 half_h = int(overlay_h * 0.45)
-                                color = (0, 255, 136, 180)  # bright green with alpha
                                 for x, a in enumerate(amps):
                                     dy = int(min(half_h, a / ref * half_h))
-                                    odraw.line([(x, baseline_y - dy), (x, baseline_y + dy)], fill=color)
+                                    odraw.line([(x, baseline_y - dy), (x, baseline_y + dy)], fill=wave_color)
                                 drew_waveform = True
                     except Exception as e:
                         logger.warning("Waveform overlay failed", extra={"audio": audio_path, "error": str(e)})
@@ -420,7 +437,40 @@ class VideoGenerator:
 
                 # If not drawn, draw a simple baseline
                 if not drew_waveform:
-                    odraw.line([(0, baseline_y), (img.width - 1, baseline_y)], fill=(255, 255, 255, 160), width=2)
+                    odraw.line([(0, baseline_y), (img.width - 1, baseline_y)], fill=baseline_color, width=baseline_width)
+
+                # Optional axes: time ticks and level ticks for better scale
+                if show_axes:
+                    # Time ticks (top edge of the strip)
+                    # Prefer audio duration; if unavailable, try to approximate with video duration used earlier
+                    dur_for_ticks = None
+                    try:
+                        # We don't have video duration stored; approximate from baseline position using image width vs audio duration
+                        dur_for_ticks = audio_duration if audio_duration and audio_duration > 0 else None
+                    except Exception:
+                        pass
+                    if dur_for_ticks and dur_for_ticks > 0:
+                        tick_t = 0.0
+                        while tick_t <= dur_for_ticks + 1e-6:
+                            x = int((tick_t / dur_for_ticks) * (img.width - 1)) if dur_for_ticks > 0 else 0
+                            odraw.line([(x, wave_top), (x, wave_top + max(3, overlay_h // 12))], fill=axes_color)
+                            tick_t += time_tick_seconds
+                    else:
+                        # Draw a few evenly spaced ticks if duration unknown
+                        for i in range(0, 6):
+                            x = int(i / 5 * (img.width - 1))
+                            odraw.line([(x, wave_top), (x, wave_top + max(3, overlay_h // 12))], fill=axes_color)
+
+                    # Level ticks (horizontal faint lines)
+                    if level_tick_count > 0:
+                        half_h = int(overlay_h * 0.45)
+                        for i in range(1, level_tick_count + 1):
+                            frac = i / (level_tick_count + 1)
+                            dy = int(frac * half_h)
+                            # above baseline
+                            odraw.line([(0, baseline_y - dy), (img.width - 1, baseline_y - dy)], fill=axes_color)
+                            # below baseline
+                            odraw.line([(0, baseline_y + dy), (img.width - 1, baseline_y + dy)], fill=axes_color)
 
                 # Composite overlay onto image
                 base_rgba = img.convert('RGBA')

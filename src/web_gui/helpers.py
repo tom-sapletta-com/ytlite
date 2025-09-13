@@ -57,13 +57,15 @@ def generate_missing_media(project_name: str, output_dir: Path) -> tuple[bool, l
                 'postgen_audio_silence' if ares.get('silent') else 'postgen_audio_ok',
                 'error' if ares.get('silent') else 'info',
                 project_name,
-                {'check': ares}
+                {'check': ares},
+                tags=['postgen', 'media']
             )
             publish_mqtt_event(
                 'postgen_video_silence' if (vres.get('silent') or not vres.get('has_audio')) else 'postgen_video_ok',
                 'error' if (vres.get('silent') or not vres.get('has_audio')) else 'info',
                 project_name,
-                {'check': vres}
+                {'check': vres},
+                tags=['postgen', 'media']
             )
         except Exception as _e:
             logger.warning(f"Media validation publish failed for {project_name}: {_e}")
@@ -160,13 +162,15 @@ def create_svg_project(project_name: str, content: str, metadata: Dict[str, Any]
                 'postgen_audio_silence' if ares.get('silent') else 'postgen_audio_ok',
                 'error' if ares.get('silent') else 'info',
                 project_name,
-                {'check': ares}
+                {'check': ares},
+                tags=['postgen', 'media']
             )
             publish_mqtt_event(
                 'postgen_video_silence' if (vres.get('silent') or not vres.get('has_audio')) else 'postgen_video_ok',
                 'error' if (vres.get('silent') or not vres.get('has_audio')) else 'info',
                 project_name,
-                {'check': vres}
+                {'check': vres},
+                tags=['postgen', 'media']
             )
         except Exception as _e:
             logger.warning(f"Media validation failed for {project_name}: {_e}")

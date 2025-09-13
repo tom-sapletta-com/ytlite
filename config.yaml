@@ -19,6 +19,29 @@ upload_schedule: "09:00"  # Time to upload daily content
 generate_shorts: true
 shorts_duration: 60  # seconds
 
+# Thumbnail settings
+thumbnail:
+  waveform:
+    # Height of the waveform strip as a fraction of image height
+    height_ratio: 0.20
+    # Waveform color and transparency (hex + alpha 0-255)
+    color: "#00ff88"
+    alpha: 180
+    # Background strip color
+    bg_color: "#000000"
+    bg_alpha: 120
+    # Axes (ticks, grid) appearance
+    show_axes: true
+    axes_color: "#ffffff"
+    axes_alpha: 80
+    # Baseline style (when no audio or silence)
+    baseline_color: "#ffffff"
+    baseline_alpha: 160
+    baseline_width: 2
+    # Time ticks granularity (seconds) and number of level lines
+    time_tick_seconds: 10
+    level_tick_count: 4
+
 # Theme colors (hex)
 themes:
   tech:
