@@ -135,9 +135,9 @@ publish-pypi: ## Publish project to PyPI
 quick: ## Quick content from stdin (echo "content" | make quick)
 	@bash scripts/quick.sh
 
-gui: ## Run Web GUI (Flask) on an available port starting from 5000
-	@echo "$(GREEN)🚀 Starting YTLite Web GUI (Refactored Version)$(NC)"
-	@cd src && YTLITE_FAST_TEST=1 bash -c 'port=5000; while lsof -i :$$port >/dev/null; do port=$$((port+1)); done; echo "Starting on port $$port"; PORT=$$port ../venv/bin/python ytlite_web_gui.py'
+gui: ## Run the new, refactored Web GUI
+	@echo "$(GREEN)🚀 Starting New YTLite Web GUI$(NC)"
+	@python3 run_new_gui.py
 
 stop: ## Stop all running servers and processes
 	@echo "$(YELLOW)Stopping all servers and processes...$(NC)"

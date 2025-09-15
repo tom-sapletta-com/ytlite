@@ -10,7 +10,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
-from flask import Flask, request, jsonify, render_template_string
+from flask import Flask, request, jsonify, render_template, render_template_string
 from dotenv import load_dotenv
 
 import sys
@@ -42,13 +42,12 @@ def setup_routes(app: Flask, base_dir: Path, output_dir: Path):
     @app.route('/')
     def index():
         logger.info("GET /")
-        from .templates import INDEX_HTML
-        return render_template_string(INDEX_HTML)
+        return render_template('index.html')
 
     # Register static/config routes
     try:
         from .routes_static import register_static_routes as _register_static_routes
-        _register_static_routes(app, output_dir, logger)
+        _register_static_routes(app, base_dir, output_dir, logger)
     except Exception as _reg_err:
         logger.warning(f"Failed to register static routes: {_reg_err}")
 
@@ -322,6 +321,20 @@ def setup_routes(app: Flask, base_dir: Path, output_dir: Path):
         from progress import load_progress
         prog = load_progress(project, output_dir)
         return jsonify(prog or {})
+
+
+    @app.route('/api/ui_event', methods=['POST'])
+    def api_ui_event():
+        """Log UI events from the browser for diagnostics and tracking."""
+        try:
+            data = request.get_json(silent=True) or {}
+            action = data.get('action')
+            context = data.get('context', {})
+            logger.info("UI event", extra={"action": action, "context": context})
+            return jsonify({"ok": True})
+        except Exception as e:
+            logger.error("UI event logging failed", extra={"error": str(e)})
+            return jsonify({"ok": False}), 500
 
 
     return app

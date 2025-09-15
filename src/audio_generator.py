@@ -40,19 +40,20 @@ class AudioGenerator:
         if os.getenv("YTLITE_FAST_TEST") == "1":
             try:
                 ffmpeg = imageio_ffmpeg.get_ffmpeg_exe()
-                logger.info("FAST_TEST enabled: generating silent MP3 via ffmpeg", extra={"ffmpeg": ffmpeg, "output": output_path})
+                logger.info("FAST_TEST enabled: generating 1s sine tone MP3 via ffmpeg (non-silent)", extra={"ffmpeg": ffmpeg, "output": output_path})
+                # Generate a 1kHz sine tone for 1 second so media validator does not flag silence
                 cmd = [
                     ffmpeg, "-y",
-                    "-f", "lavfi", "-i", "anullsrc=r=44100:cl=mono",
-                    "-t", "1",
-                    "-q:a", "9",
+                    "-f", "lavfi", "-i", "sine=frequency=1000:sample_rate=44100:duration=1",
+                    "-ac", "1", "-ar", "44100",
+                    "-q:a", "4",
                     output_path,
                 ]
                 subprocess.run(cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-                console.print(f"[green]✓ (FAST_TEST) Audio saved: {output_path}[/]")
+                console.print(f"[green]✓ (FAST_TEST) Tone audio saved: {output_path}[/]")
                 return output_path
             except Exception as e:
-                logger.warning("FAST_TEST ffmpeg generation failed, falling back to edge-tts", extra={"error": str(e)})
+                logger.warning("FAST_TEST ffmpeg tone generation failed, falling back to edge-tts", extra={"error": str(e)})
                 # fall through to normal path
         asyncio.run(self.generate_audio_async(text, output_path))
         return output_path

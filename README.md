@@ -107,10 +107,26 @@ make preview  # http://localhost:8080
 - **Performance Optimization**: Efficient processing with progress tracking
 - **Error Recovery**: Graceful handling of failures with detailed logging
 
-## Web GUI (real‑time) — generowanie z podglądem
+## Nowy Web GUI (Zarządzanie Projektami)
 
-- Uruchom: `make gui`
-- Otwórz: http://localhost:5000
+Nowy, rozbudowany interfejs webowy do zarządzania projektami, edycji, walidacji i publikacji.
+
+### Uruchomienie
+
+```bash
+# Uruchom serwer deweloperski GUI
+python3 run_new_gui.py
+```
+
+- Otwórz w przeglądarce: **http://localhost:5000**
+
+### Funkcje
+
+- **Zarządzanie projektami**: Przeglądanie, tworzenie i usuwanie projektów w widoku siatki lub tabeli.
+- **Edytor w czasie rzeczywistym**: Edytuj pliki markdown i metadane z podglądem na żywo.
+- **Walidacja**: Uruchamiaj walidację projektu bezpośrednio z interfejsu.
+- **Publikacja**: Publikuj filmy na YouTube i posty na WordPress jednym kliknięciem.
+- **Podgląd mediów**: Zobacz wygenerowane wideo, audio i miniatury.
 
 Powiązania z podglądem NGINX:
 - Równolegle możesz uruchomić `make preview` (http://localhost:8080) do przeglądania całego `output/`.

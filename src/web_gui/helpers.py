@@ -138,7 +138,7 @@ def create_svg_project(project_name: str, content: str, metadata: Dict[str, Any]
             audio_path = project_dir / f"{project_name}.mp3"
         if not audio_path.exists():
             # WAV fallbacks
-            ap = output_dir / 'audio' / f"{project_name}.wav"
+            ap = base_output_dir / 'audio' / f"{project_name}.wav"
             if ap.exists():
                 audio_path = ap
             else:

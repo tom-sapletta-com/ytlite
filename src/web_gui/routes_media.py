@@ -68,6 +68,9 @@ def register_media_routes(app, output_dir: Path, logger) -> None:
             if not full_path.exists():
                 logger.warning(f"File not found: {filepath}")
                 return 'File not found', 404
+            if full_path.is_dir():
+                logger.warning(f"Requested path is a directory, not a file: {filepath}")
+                return 'Not a file', 404
             return send_from_directory(
                 str(output_dir),
                 filepath,

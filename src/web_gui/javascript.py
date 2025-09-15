@@ -6,15 +6,48 @@ Extracted from web_gui.py for better modularity
 
 def get_javascript_content():
     """Return the JavaScript content for the web GUI."""
+    # Prefer modular static JS files if present
+    try:
+        from pathlib import Path
+        base = Path(__file__).resolve().parents[2]  # project root
+        parts = []
+        modular_order = [
+            'globals.js',
+            'logger.js',
+            'status.js',
+            'theme.js',
+            'validation.js',
+            'form.js',
+            'projects-grid.js',
+            'projects-table.js',
+            'media.js',
+            'publish.js',
+            'history.js',
+            'projects.js',
+            'operations.js',
+            'actions.js',
+            'bootstrap.js',
+        ]
+        for name in modular_order:
+            p = base / 'web_static' / 'static' / 'js' / name
+            if p.exists():
+                parts.append(p.read_text(encoding='utf-8'))
+        if parts:
+            return '\n'.join(parts)
+        # fallback to older single-file if present
+        single = base / 'web_static' / 'static' / 'js' / 'web_gui.js'
+        if single.exists():
+            return single.read_text(encoding='utf-8')
+    except Exception:
+        pass
     return """
-(function() {
-  "use strict";
+'use strict';
 
-  document.addEventListener('DOMContentLoaded', function() {
-    initLogger();
-    loadTheme();
-    loadProjects();
-  });
+document.addEventListener('DOMContentLoaded', function() {
+  initLogger();
+  loadTheme();
+  loadProjects();
+});
 
 // Project view toggle functionality
 let currentProjectView = 'grid';
@@ -45,30 +78,26 @@ function switchProjectView(view) {
     projectsTable.classList.remove('active');
     loadProjects(); // Reload grid view
   }
+}
 
 // Manual media check via button
 async function checkMedia(projectName) {
   if (!projectName) return;
   try {
-    const res = await fetch(`/api/check_media?project=${encodeURIComponent(projectName)}`, { cache: 'no-store' });
+    const res = await fetch('/api/check_media?project=' + encodeURIComponent(projectName), { cache: 'no-store' });
     const data = await res.json();
     if (!res.ok) {
-      showMessage(`❌ Media check failed: ${data.error || data.message || res.status}`, 'error');
-      logEvent(`Media check failed for ${projectName}`, 'error', data);
+      showMessage('Media check failed', 'error');
       return;
     }
-    const a = data.audio || {}; const v = data.video || {};
-    const ok = !!data.ok;
-    const lines = [];
-    lines.push(`Audio: ${a.exists ? 'exists' : 'missing'}${a.mean_db != null ? `, mean=${a.mean_db.toFixed ? a.mean_db.toFixed(1) : a.mean_db} dB` : ''}${a.silent ? ', silent' : ''}`);
-    lines.push(`Video: ${v.exists ? 'exists' : 'missing'}${v.has_audio ? ', has_audio' : ', no audio'}${v.mean_db != null ? `, mean=${v.mean_db.toFixed ? v.mean_db.toFixed(1) : v.mean_db} dB` : ''}${v.silent ? ', silent' : ''}`);
-    const msg = `Media check for "${projectName}":\n` + lines.join('\n');
-    showMessage(msg, ok ? 'success' : 'warning');
-    logEvent(`Media check for ${projectName}`, ok ? 'success' : 'warn', data);
+    const status = (data && data.ok) ? 'OK' : 'Issues detected';
+    const type = (data && data.ok) ? 'success' : 'warning';
+    const msg = 'Media check for ' + projectName + ': ' + status;
+    if (typeof logEvent === 'function') { try { logEvent('Media check', type, data); } catch (_) {} }
+    showMessage(msg, type);
   } catch (e) {
-    showMessage(`❌ Media check error: ${e.message}`, 'error');
+    showMessage('Media check error: ' + e.message, 'error');
   }
-}
 }
 
 // --- Media Preview ---
@@ -139,6 +168,7 @@ async function updateMediaPreview(projectName) {
 
 // Expose immediately after definition to avoid scope issues
 window.updateMediaPreview = updateMediaPreview;
+window.checkMedia = checkMedia;
 
 // Pre-playback media validator: stops playback if silence/missing audio is detected
 async function prePlaybackCheck(projectName, mediaEl, kind) {
@@ -1118,29 +1148,139 @@ function showMessage(text, type = 'info') {
   }, 3000);
 }
 
-  // Attach functions to window object to make them accessible from HTML
-  window.toggleTheme = toggleTheme;
-  window.switchProjectView = switchProjectView;
-  window.showFormForCreate = showFormForCreate;
-  window.hideProjectForm = hideProjectForm;
-  window.generateProject = generateProject;
-  window.updateProject = updateProject;
-  window.deleteProject = deleteProject;
-  window.validateProject = validateProject;
-  window.publishToYoutube = publishToYoutube;
-  window.publishToWordPress = publishToWordPress;
-  window.showVersionHistory = showVersionHistory;
-  window.restoreVersion = restoreVersion;
-  window.openSVGWithAutoplay = openSVGWithAutoplay;
-  window.selectProject = selectProject;
-  // Expose validators and edit handlers used by inline HTML attributes
-  window.validateField = validateField;
-  window.validateAllFields = validateAllFields;
-  window.editProject = editProject;
-  window.editSVGProject = editSVGProject;
-  window.generateMedia = generateMedia;
+// --- UI Action Tracking & Instrumentation ---
+// Sends UI actions to the backend and updates URL hash so actions are visible/shareable
+function trackAction(action, context = {}) {
+  try {
+    if (action) {
+      window.location.hash = '#' + encodeURIComponent(String(action));
+    }
+    // Fire-and-forget log to backend
+    fetch('/api/ui_event', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action, context })
+    }).catch(() => {});
+    if (typeof logEvent === 'function') {
+      try { logEvent(`UI: ${action}`, 'info', context); } catch (_) {}
+    }
+  } catch (_) {}
+}
 
-})();
+// Global click tracker: hash reflects last clicked element id/data-action
+document.addEventListener('click', function (ev) {
+  try {
+    const t = ev.target && ev.target.closest && ev.target.closest('[data-action],button,a,[role="button"],[id]');
+    if (!t) return;
+    const act = t.getAttribute('data-action') || t.id || (t.tagName.toLowerCase() + (t.textContent ? ':' + t.textContent.trim().slice(0, 40) : ''));
+    trackAction(act, { tag: t.tagName, id: t.id || null, classes: t.className || '' });
+  } catch (_) {}
+});
+
+// Wrap selected functions so programmatic calls also update hash and logs
+function _wrapAction(name, fn) {
+  if (typeof fn !== 'function') return fn;
+  return function(...args) {
+    trackAction(name, { args_preview: (args && args.length ? String(args[0]).slice(0, 80) : null) });
+    return fn.apply(this, args);
+  }
+}
+
+// Preserve originals then wrap
+const __orig_toggleTheme = toggleTheme;
+const __orig_showFormForCreate = showFormForCreate;
+const __orig_switchProjectView = switchProjectView;
+const __orig_generateProject = generateProject;
+const __orig_updateProject = updateProject;
+const __orig_deleteProject = deleteProject;
+const __orig_publishToYoutube = publishToYoutube;
+const __orig_publishToWordPress = publishToWordPress;
+const __orig_showVersionHistory = showVersionHistory;
+const __orig_restoreVersion = restoreVersion;
+const __orig_openSVGWithAutoplay = openSVGWithAutoplay;
+const __orig_validateProject = validateProject;
+const __orig_editProject = editProject;
+
+toggleTheme = _wrapAction('theme-toggle', __orig_toggleTheme);
+showFormForCreate = _wrapAction('showFormForCreate', __orig_showFormForCreate);
+switchProjectView = (function(orig){
+  return function(view){
+    trackAction('switchProjectView:' + view, { view });
+    return orig(view);
+  }
+})(__orig_switchProjectView);
+generateProject = _wrapAction('generateBtn', __orig_generateProject);
+updateProject = _wrapAction('updateBtn', __orig_updateProject);
+deleteProject = (function(orig){
+  return function(projectName, event){
+    trackAction('deleteProject', { project: projectName });
+    return orig(projectName, event);
+  }
+})(__orig_deleteProject);
+publishToYoutube = (function(orig){
+  return function(projectName, event){
+    trackAction('publishToYoutube', { project: projectName });
+    return orig(projectName, event);
+  }
+})(__orig_publishToYoutube);
+publishToWordPress = (function(orig){
+  return function(projectName, event){
+    trackAction('publishToWordPress', { project: projectName });
+    return orig(projectName, event);
+  }
+})(__orig_publishToWordPress);
+showVersionHistory = (function(orig){
+  return function(projectName, event){
+    trackAction('showVersionHistory', { project: projectName });
+    return orig(projectName, event);
+  }
+})(__orig_showVersionHistory);
+restoreVersion = (function(orig){
+  return function(projectName, versionFile){
+    trackAction('restoreVersion', { project: projectName, version: versionFile });
+    return orig(projectName, versionFile);
+  }
+})(__orig_restoreVersion);
+openSVGWithAutoplay = (function(orig){
+  return function(svgPath, event){
+    trackAction('openSVG', { path: svgPath });
+    return orig(svgPath, event);
+  }
+})(__orig_openSVGWithAutoplay);
+validateProject = (function(orig){
+  return function(projectName, event){
+    trackAction('validateProject', { project: projectName });
+    return orig(projectName, event);
+  }
+})(__orig_validateProject);
+editProject = (function(orig){
+  return function(projectName, event){
+    trackAction('editProject', { project: projectName });
+    return orig(projectName, event);
+  }
+})(__orig_editProject);
+
+// Expose functions to window object to make them accessible from HTML
+window.toggleTheme = toggleTheme;
+window.switchProjectView = switchProjectView;
+window.showFormForCreate = showFormForCreate;
+window.hideProjectForm = hideProjectForm;
+window.generateProject = generateProject;
+window.updateProject = updateProject;
+window.deleteProject = deleteProject;
+window.validateProject = validateProject;
+window.publishToYoutube = publishToYoutube;
+window.publishToWordPress = publishToWordPress;
+window.showVersionHistory = showVersionHistory;
+window.restoreVersion = restoreVersion;
+window.openSVGWithAutoplay = openSVGWithAutoplay;
+window.selectProject = selectProject;
+// Expose validators and edit handlers used by inline HTML attributes
+window.validateField = validateField;
+window.validateAllFields = validateAllFields;
+window.editProject = editProject;
+window.editSVGProject = editProject; // keep alias current
+window.generateMedia = generateMedia;
 """
 
 JAVASCRIPT_CODE = get_javascript_content()
