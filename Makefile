@@ -139,6 +139,14 @@ gui: ## Run the new, refactored Web GUI
 	@echo "$(GREEN)🚀 Starting New YTLite Web GUI$(NC)"
 	@python3 run_new_gui.py
 
+gui-normal: ## Run the Web GUI with Edge TTS (FAST_TEST=0)
+	@echo "$(GREEN)🚀 Starting YTLite Web GUI (Edge TTS)$(NC)"
+	@YTLITE_FAST_TEST=0 python3 run_new_gui.py
+
+gui-fasttest: ## Run the Web GUI in FAST_TEST mode (tone audio)
+	@echo "$(YELLOW)⚡ Starting YTLite Web GUI in FAST_TEST mode (tone audio)$(NC)"
+	@YTLITE_FAST_TEST=1 python3 run_new_gui.py
+
 stop: ## Stop all running servers and processes
 	@echo "$(YELLOW)Stopping all servers and processes...$(NC)"
 	-@pkill -f "python3.*web_gui" 2>/dev/null

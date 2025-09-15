@@ -94,3 +94,5 @@ po wykonaniu filmu stworz miniaturke
 
 - do tabeli z widokiem listy projektow dodaj sortowanie po nazwie i czasie utworzenia i czasie aaktualizacji/edycji
 - dodaj tez do kazdego projektu mala miniaturke 64px
+
+
