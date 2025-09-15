@@ -14,21 +14,10 @@ from typing import Tuple
 
 from flask import request, jsonify, send_from_directory
 
-# These imports rely on sys.path adjustments done in routes.py before calling register_media_routes
-try:
-    from media_validator import check_audio_silence, check_video_audio_silence
-except Exception:  # pragma: no cover - fallback to relative if packaging differs
-    from ..media_validator import check_audio_silence, check_video_audio_silence  # type: ignore
+from media_validator import check_audio_silence, check_video_audio_silence
+from mqtt_client import publish_mqtt_event
 
-try:
-    from mqtt_client import publish_mqtt_event
-except Exception:  # pragma: no cover
-    from ..mqtt_client import publish_mqtt_event  # type: ignore
-
-try:
-    import helpers  # when imported from web_gui package context
-except Exception:  # pragma: no cover
-    from . import helpers  # type: ignore
+from . import helpers
 
 
 def _mime_for(path: str) -> str:

@@ -1,37 +1,25 @@
 #!/usr/bin/env python3
-"""Simple, reliable startup for new refactored YTLite Web GUI"""
-import sys
+"""Run the YTLite Web GUI using the application factory."""
 import os
+import sys
 from pathlib import Path
 
-# Setup
+# Ensure src is in the path
 current_dir = Path(__file__).parent
-src_dir = current_dir / 'src'  
-sys.path.insert(0, str(src_dir))
-# Do NOT force FAST_TEST in normal GUI usage. Allow override via env.
-import os as _os
-_os.environ.setdefault('YTLITE_FAST_TEST', '0')
+src_dir = current_dir / 'src'
+if str(src_dir) not in sys.path:
+    sys.path.insert(0, str(src_dir))
 
-# Direct imports and app creation
-from flask import Flask
-from web_gui.javascript import get_javascript_content  
-from web_gui.routes import setup_routes
+from web_gui import create_app
 
-# Create app
-app = Flask(__name__)
-base_dir = current_dir
-output_dir = base_dir / 'output'
-output_dir.mkdir(exist_ok=True)
+# Set default FAST_TEST mode if not already set
+os.environ.setdefault('YTLITE_FAST_TEST', '0')
 
-# Setup routes
-setup_routes(app, base_dir, output_dir)
-
-print("🚀 New Refactored YTLite Web GUI")
-print("✓ Using modular ytlite_web_gui.py architecture") 
-print("✓ Updated routes.py with corrected SVGDataURIPackager")
-print("✓ Enhanced form validation and real-time errors")
-print(f"✓ FAST_TEST mode: {'ON (tone audio)' if _os.environ.get('YTLITE_FAST_TEST') == '1' else 'OFF (Edge TTS)'}")
-print("🌐 http://localhost:5000")
+app = create_app()
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=True, use_reloader=False)
+    port = int(os.environ.get('FLASK_RUN_PORT', 5000))
+    print("🚀 YTLite Web GUI with App Factory")
+    print(f"✓ FAST_TEST mode: {'ON (tone audio)' if os.environ.get('YTLITE_FAST_TEST') == '1' else 'OFF (Edge TTS)'}")
+    print(f"🌐 http://localhost:{port}")
+    app.run(host='0.0.0.0', port=port, debug=True, use_reloader=False)

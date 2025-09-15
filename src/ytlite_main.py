@@ -32,11 +32,18 @@ logger = get_logger("ytlite_main")
 class YTLite:
     """Main YTLite orchestrator using modular components"""
     
-    def __init__(self, config_path: str = "config.yaml", output_dir: str = "output", project_name: str = None):
+    def __init__(self, config_path: str = "config.yaml", output_dir: str = "output", project_name: str = None, config_overrides: dict = None):
         self.config = self._load_config(config_path)
         self.content_parser = ContentParser()
         self.audio_generator = AudioGenerator(self.config)
         self.video_generator = VideoGenerator(self.config)
+
+        if config_overrides:
+            # Deep merge would be better, but for flat keys this is fine
+            for key, value in config_overrides.items():
+                if value:
+                    self.config[key] = value
+            logger.info("Applied config overrides from web GUI", extra={"overrides": config_overrides})
         
         # Setup output directories
         self.output_dir = Path(output_dir)
@@ -124,15 +131,19 @@ class YTLite:
             console.print("Step 4: Creating slides...")
             slides_text = self.content_parser.prepare_content_for_video(paragraphs)
             slide_paths = []
-            # Metadata overrides
-            lang = metadata.get('lang')
-            theme = metadata.get('theme', 'tech')
-            template = metadata.get('template', 'classic')
-            font_size_override = metadata.get('font_size')
-            colors = metadata.get('colors') if isinstance(metadata.get('colors'), dict) else None
+            # Prioritize GUI overrides, then frontmatter, then defaults
+            lang = self.config.get('lang') or metadata.get('lang')
+            theme = self.config.get('theme') or metadata.get('theme', 'tech')
+            template = self.config.get('template') or metadata.get('template', 'classic')
+            font_size_override = self.config.get('font_size') or metadata.get('font_size')
+            colors = self.config.get('colors') or metadata.get('colors')
+            if not isinstance(colors, dict):
+                colors = None
+
             # Voice override for audio
-            if metadata.get('voice'):
-                self.audio_generator.voice = metadata['voice']
+            voice_override = self.config.get('voice') or metadata.get('voice')
+            if voice_override:
+                self.audio_generator.voice = voice_override
             for i, text in enumerate(slides_text):
                 slide_path = self.video_generator.create_slide(
                     text,
@@ -274,6 +285,7 @@ class YTLite:
         
         logger.info("Packaging done")
 
+
         # Create a simple index.md to navigate assets (if not SVG-only)
         index_md = f"""
 # {metadata.get('title', base_name)}
@@ -342,6 +354,32 @@ class YTLite:
 
         (self.output_dir / "README.md").write_text("\n".join(lines).strip() + "\n", encoding="utf-8")
         logger.info("Output index written", extra={"path": str(self.output_dir / 'README.md'), "count": len(items)})
+
+    def run_from_content(self, markdown_content: str, project_name: str, force_regenerate: bool = False):
+        """Generate video from markdown content string."""
+        project_dir = self.output_dir / "projects" / project_name
+        project_dir.mkdir(parents=True, exist_ok=True)
+        tmp_md_path = project_dir / f"{project_name}.md"
+
+        # If we don't force regenerate, and video exists, skip
+        video_path = self.output_dir / "videos" / f"{project_name}.mp4"
+        if not force_regenerate and video_path.exists():
+            logger.info(f"Video for {project_name} already exists and force_regenerate is False. Skipping.")
+            return {"success": True, "message": "Video already exists.", "video_path": str(video_path)}
+
+        try:
+            tmp_md_path.write_text(markdown_content, encoding="utf-8")
+            logger.info(f"Created temporary markdown file: {tmp_md_path}")
+            self.generate_video(str(tmp_md_path))
+            return {"success": True, "message": "Video generated successfully."}
+        except Exception as e:
+            logger.error(f"Failed to generate video from content for {project_name}: {e}", exc_info=True)
+            return {"success": False, "message": str(e)}
+        finally:
+            # Clean up the temporary markdown file if it exists
+            if tmp_md_path.exists():
+                # pass # Keep for debugging
+                tmp_md_path.unlink()
 
 @click.group()
 def cli():

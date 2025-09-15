@@ -25,6 +25,7 @@ uvicorn>=0.30.0
 # Development and testing
 pytest>=7.4.0
 watchdog>=3.0.0
+pytest-playwright>=0.4.0
 
 # Optional advanced features
 openai-whisper>=20231117

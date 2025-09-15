@@ -13,21 +13,8 @@ from typing import Optional
 from flask import Flask, request, jsonify, render_template, render_template_string
 from dotenv import load_dotenv
 
-import sys
-import os
-sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
-
 from logging_setup import get_logger
-
-# Import helpers directly to avoid import issues
-import sys
-import os
-# Add the web_gui directory to path if needed
-web_gui_dir = os.path.dirname(__file__)
-if web_gui_dir not in sys.path:
-    sys.path.insert(0, web_gui_dir)
-
-import helpers
+from . import helpers
 
 logger = get_logger("web_gui.routes")
 
@@ -116,13 +103,25 @@ def setup_routes(app: Flask, base_dir: Path, output_dir: Path):
                 project_dir = output_dir / 'projects' / project
                 is_update = project_dir.exists()
 
+                # Collect all potential overrides from the form
+                config_overrides = {
+                    'voice': data.get('voice'),
+                    'theme': data.get('theme'),
+                    'template': data.get('template'),
+                    'font_size': data.get('font_size'),
+                    'lang': data.get('lang')
+                }
+                # Filter out any empty values so we don't override with None
+                config_overrides = {k: v for k, v in config_overrides.items() if v}
+
                 # Create/update SVG project
                 svg_path = helpers.create_svg_project(
                     project_name=project,
                     content=data.get('markdown', ''),
-                    metadata=data,
+                    metadata=data, # Pass all form data as metadata
                     output_path=svg_file,
-                    force_regenerate=force_regenerate
+                    force_regenerate=force_regenerate,
+                    config_overrides=config_overrides
                 )
                 
                 if svg_path:
@@ -171,45 +170,6 @@ def setup_routes(app: Flask, base_dir: Path, output_dir: Path):
             logger.debug(f"Full error details: {e}", exc_info=True)
             return jsonify({'message': str(e)}), 500
 
-    @app.route('/api/publish_wordpress', methods=['POST'])
-    def api_publish_wordpress():
-        """Legacy WordPress publishing endpoint."""
-        try:
-            data = request.get_json(silent=True) or {}
-            project = data.get('project', '').strip()
-            if not project:
-                return jsonify({'message': 'Missing project name'}), 400
-
-            proj_dir = output_dir / 'projects' / project
-            if not proj_dir.exists():
-                return jsonify({'message': f'Project "{project}" not found'}), 404
-
-            # Load per-project env if provided
-            if project:
-                proj_env = output_dir / 'projects' / project / '.env'
-                if proj_env.exists():
-                    load_dotenv(str(proj_env))
-
-            # Prefer monkeypatched publisher if provided
-            publisher_cls = WordPressPublisher
-            if publisher_cls is None:
-                try:
-                    from wordpress_publisher import WordPressPublisher as _WPP
-                    publisher_cls = _WPP
-                except Exception as _imp_err:
-                    logger.error(f"Failed to import WordPressPublisher: {_imp_err}")
-                    return jsonify({'message': 'Publish failed'}), 500
-
-            pub = publisher_cls()
-            result = pub.publish_project(str(proj_dir), publish_status=data.get('status', 'draft'))
-            if not result:
-                logger.error("Publish failed", extra={"project": project})
-                return jsonify({'message': 'Publish failed'}), 500
-            logger.info("Publish ok", extra={"project": project, "id": result.get('id') if isinstance(result, dict) else None})
-            return jsonify(result)
-        except Exception as e:
-            logger.error("POST /api/publish_wordpress failed", extra={"error": str(e)})
-            return jsonify({'message': str(e)}), 500
 
     @app.route('/api/publish/youtube', methods=['POST'])
     def api_publish_youtube():

@@ -1,49 +1,69 @@
-from pathlib import Path
-import json
-import os
-import io
-import sys
-import time
 import pytest
+from playwright.sync_api import Page, expect
+import time
 
-ROOT = Path(__file__).resolve().parents[1]
-SRC = ROOT / "src"
-if str(SRC) not in sys.path:
-    sys.path.insert(0, str(SRC))
+@pytest.mark.e2e
+def test_create_project(page: Page, live_server: str):
+    """Test creating a new project via the web GUI."""
+    PROJECT_NAME = f"e2e_test_{int(time.time())}"
+    page.goto(live_server)
 
-# Import the Flask app from the correct location
-from src.ytlite_web_gui import create_production_app
+    page.click("button:has-text('New Project')")
 
-@pytest.fixture
-def client():
-    """Fixture for Flask test client."""
-    app = create_production_app()
-    app.config['TESTING'] = True
-    with app.test_client() as test_client:
-        yield test_client
+    page.fill("input[name='project']", PROJECT_NAME)
+    page.fill("textarea[name='markdown']", "# Test Title\n\nThis is a test paragraph.")
+    page.select_option("select[name='voice']", 'en-US-AriaNeural')
+    page.select_option("select[name='theme']", 'tech')
 
-def test_generate_valid_markdown_e2e(client):
-    """Test generating a project with valid markdown content (E2E)."""
-    project = f"e2e_valid_{int(time.time())}"
-    valid_md = "# Title\nSome content here"
-    resp = client.post(
-        "/api/generate",
-        data={"project": project, "markdown": valid_md},
-        content_type="multipart/form-data",
-    )
-    assert resp.status_code == 500, resp.data
-    data = resp.get_json()
-    assert 'message' in data, "Expected message in response"
+    page.click("button:has-text('Create Project')")
 
-def test_generate_invalid_frontmatter_e2e(client):
-    """Test generating a project with invalid frontmatter (should fallback)."""
-    project = f"e2e_invalid_fm_{int(time.time())}"
-    bad_md = "---\ntitle: Invalid YAML ---\nContent"
-    resp = client.post(
-        "/api/generate",
-        data={"project": project, "markdown": bad_md},
-        content_type="multipart/form-data",
-    )
-    assert resp.status_code == 500, resp.data
-    data = resp.get_json()
-    assert 'message' in data, "Expected message in response"
+    expect(page.locator("#toast-container")).to_contain_text(f'Project "{PROJECT_NAME}" generated successfully.')
+    expect(page.locator(f"#project-card-{PROJECT_NAME}")).to_be_visible()
+
+@pytest.mark.e2e
+def test_edit_project_and_regenerate(page: Page, live_server: str):
+    """Test editing a project, changing settings, and regenerating media."""
+    EDIT_PROJECT_NAME = f"e2e_edit_test_{int(time.time())}"
+    page.goto(live_server)
+    page.click("button:has-text('New Project')")
+    page.fill("input[name='project']", EDIT_PROJECT_NAME)
+    page.fill("textarea[name='markdown']", "# Edit Test\n\nContent to be edited.")
+    page.select_option("select[name='theme']", 'tech')
+    page.select_option("select[name='voice']", 'en-US-AriaNeural')
+    page.click("button:has-text('Create Project')")
+    expect(page.locator(f"#project-card-{EDIT_PROJECT_NAME}")).to_be_visible()
+
+    page.click(f"#project-card-{EDIT_PROJECT_NAME} button:has-text('Edit')")
+
+    expect(page.locator("input[name='project']")).to_have_value(EDIT_PROJECT_NAME)
+    page.select_option("select[name='theme']", 'philosophy')
+    page.select_option("select[name='voice']", 'pl-PL-MarekNeural')
+    page.check("input[name='force_regenerate']")
+
+    page.click("button:has-text('Update Project')")
+
+    expect(page.locator("#toast-container")).to_contain_text(f'Project "{EDIT_PROJECT_NAME}" generated successfully.')
+
+    page.click(f"#project-card-{EDIT_PROJECT_NAME} button:has-text('Edit')")
+    expect(page.locator("select[name='theme']")).to_have_value('philosophy')
+    expect(page.locator("select[name='voice']")).to_have_value('pl-PL-MarekNeural')
+
+@pytest.mark.e2e
+def test_delete_project(page: Page, live_server: str):
+    """Test deleting a project via the web GUI."""
+    PROJECT_TO_DELETE = f"e2e_delete_test_{int(time.time())}"
+    page.goto(live_server)
+    page.click("button:has-text('New Project')")
+    page.fill("input[name='project']", PROJECT_TO_DELETE)
+    page.fill("textarea[name='markdown']", "# To Be Deleted")
+    page.click("button:has-text('Create Project')")
+    expect(page.locator(f"#project-card-{PROJECT_TO_DELETE}")).to_be_visible()
+
+    project_card = page.locator(f"#project-card-{PROJECT_TO_DELETE}")
+    expect(project_card).to_be_visible()
+
+    project_card.locator("button:has-text('Delete')").click()
+
+    expect(page.locator("#toast-container")).to_contain_text(f'Project "{PROJECT_TO_DELETE}" deleted successfully')
+    
+    expect(project_card).not_to_be_visible()

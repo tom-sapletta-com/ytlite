@@ -76,11 +76,17 @@ def generate_missing_media(project_name: str, output_dir: Path) -> tuple[bool, l
         logger.error(f"Error generating media for {project_name}: {e}")
         return False, [], str(e)
 
+def run_ytlite_generation(project_name: str, markdown_content: str, force_regenerate: bool = False, config_overrides: Optional[dict] = None) -> dict:
+    """Run YTLite generation process."""
+    from ytlite_main import YTLite
+
+    ytlite_instance = YTLite(config_overrides=config_overrides or {})
+    return ytlite_instance.run_from_content(markdown_content, project_name, force_regenerate)
+
 def create_svg_project(project_name: str, content: str, metadata: Dict[str, Any] = None,
-                      output_path: Path = None, force_regenerate: bool = False) -> Optional[Path]:
+                      output_path: Path = None, force_regenerate: bool = False, config_overrides: Optional[dict] = None) -> Optional[Path]:
     """Create a single SVG project file with embedded media."""
     
-    from ytlite_main import YTLite
     from svg_datauri_packager import SVGDataURIPackager
 
     if output_path is None:
@@ -92,41 +98,19 @@ def create_svg_project(project_name: str, content: str, metadata: Dict[str, Any]
         metadata = {}
 
     try:
-        # Use YTLite to generate the necessary files from content
-        logger.info(f"Running YTLite to generate media for {project_name}")
-        if force_regenerate:
-            logger.info(f"Force regenerate enabled for {project_name}. Deleting existing media.")
-            # Correctly reference the base 'output' directory from the svg_projects path
-            base_output_dir = output_path.parent.parent 
-            media_files = [
-                base_output_dir / 'audio' / f"{project_name}.mp3",
-                base_output_dir / 'videos' / f"{project_name}.mp4",
-                base_output_dir / 'thumbnails' / f"{project_name}.jpg"
-            ]
-            for f in media_files:
-                if f.exists():
-                    try:
-                        f.unlink()
-                        logger.info(f"Deleted {f}")
-                    except OSError as e:
-                        logger.error(f"Error deleting {f}: {e}")
+        # Run YTLite generation process, passing the specific overrides
+        ytlite_result = run_ytlite_generation(project_name, content, force_regenerate, config_overrides)
 
-        ytlite = YTLite(output_dir=str(output_path.parent.parent), project_name=project_name)
-        
-        # Create a temporary markdown file for YTLite to process
-        project_dir = output_path.parent.parent / 'projects' / project_name
-        project_dir.mkdir(parents=True, exist_ok=True)
-        md_file = project_dir / f"{project_name}.md"
-        md_file.write_text(content, encoding='utf-8')
+        if not ytlite_result.get('success'):
+            logger.error(f"YTLite generation failed for {project_name}. See previous logs for details.")
+            return None
 
-        # Generate the video and audio
-        ytlite.generate_video(str(md_file))
-        
         # Resolve centralized output directories
         base_output_dir = output_path.parent.parent
         videos_dir = base_output_dir / 'videos'
         audio_dir = base_output_dir / 'audio'
         thumbs_dir = base_output_dir / 'thumbnails'
+        project_dir = base_output_dir / 'projects' / project_name
 
         # Resolve paths to generated files (prefer centralized dirs, fallback to project dir)
         video_path = videos_dir / f"{project_name}.mp4"

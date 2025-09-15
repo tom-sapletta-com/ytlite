@@ -75,7 +75,7 @@ def _fix_common_xml_issues(svg_content: str) -> str:
     
     # Fix boolean attributes that need explicit values in XML
     fixes = [
-        (r'<video\s+([^>]*\s+)?controls(\s+[^>]*)?>', r'<video \1controls="controls"\2>'),
+        (r'<video(\s+[^>]*?)?\s+controls(\s+[^>]*)?>', r'<video\1 controls="controls"\2>'),
         (r'<audio\s+([^>]*\s+)?controls(\s+[^>]*)?>', r'<audio \1controls="controls"\2>'),
         (r'<video\s+([^>]*\s+)?autoplay(\s+[^>]*)?>', r'<video \1autoplay="autoplay"\2>'),
         (r'<audio\s+([^>]*\s+)?autoplay(\s+[^>]*)?>', r'<audio \1autoplay="autoplay"\2>'),

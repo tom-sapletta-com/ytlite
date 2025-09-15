@@ -57,7 +57,8 @@ Drugi akapit to drugi slajd.
 Krótko. Konkretnie. Skutecznie.
 ```
 
-### Przykładowe treści:
+### Przykładowe treści
+
 - [`welcome.md`](content/episodes/welcome.md) - wprowadzenie do YTLite
 - [`wetware_intro.md`](content/episodes/wetware_intro.md) - temat wetware/cyborgizacji
 - [`philosophy_time.md`](content/episodes/philosophy_time.md) - refleksje filozoficzne
@@ -81,6 +82,7 @@ make preview  # http://localhost:8080
 ## Features
 
 ### 🎬 Content Creation
+
 - **Single-File SVG Projects**: Each project stored as one SVG file with embedded metadata and media
 - **DataURI Media Embedding**: MP4, MP3, WAV files embedded directly in SVG using data URIs
 - **Interactive SVG Files**: SVG files playable in browsers with video controls and metadata display
@@ -89,12 +91,14 @@ make preview  # http://localhost:8080
 - **Voice Synthesis**: High-quality text-to-speech using Azure Cognitive Services with 200+ voices
 
 ### 🔧 Advanced Validation & Management
+
 - **XML Validation**: Comprehensive SVG validation with automatic error fixing
 - **Version Control**: Automatic backup system for all project modifications
 - **Project Management**: Complete lifecycle management via Web GUI
 - **Batch Operations**: Bulk validation and processing of multiple projects
 
 ### 🌐 Integrations & Publishing
+
 - **WordPress Integration**: Direct publishing to WordPress sites with embedded SVG media
 - **Docker WordPress**: Containerized WordPress environment for testing and development
 - **Nextcloud Integration**: Content synchronization and remote storage for SVG projects
@@ -102,6 +106,7 @@ make preview  # http://localhost:8080
 - **REST API**: Complete programmatic access to all functionality
 
 ### 🛡️ Security & Performance
+
 - **Path Traversal Protection**: Secure file access with validation
 - **Input Sanitization**: Comprehensive validation of all user inputs
 - **Performance Optimization**: Efficient processing with progress tracking
@@ -114,11 +119,14 @@ Nowy, rozbudowany interfejs webowy do zarządzania projektami, edycji, walidacji
 ### Uruchomienie
 
 ```bash
-# Uruchom serwer deweloperski GUI
-python3 run_new_gui.py
+# Uruchom serwer GUI z normalnym generowaniem audio (Edge TTS)
+make gui-normal
+
+# Uruchom w trybie szybkich testów (generuje 1-sekundowy ton zamiast TTS)
+make gui-fasttest
 ```
 
-- Otwórz w przeglądarce: **http://localhost:5000**
+- Otwórz w przeglądarce: [http://localhost:5000](http://localhost:5000)
 
 ### Funkcje
 
@@ -129,11 +137,12 @@ python3 run_new_gui.py
 - **Podgląd mediów**: Zobacz wygenerowane wideo, audio i miniatury.
 
 Powiązania z podglądem NGINX:
-- Równolegle możesz uruchomić `make preview` (http://localhost:8080) do przeglądania całego `output/`.
+- Równolegle możesz uruchomić `make preview` ([http://localhost:8080](http://localhost:8080)) do przeglądania całego `output/`.
 - Jeśli ustawisz `PUBLIC_BASE_URL` (np. `http://localhost:8080`), linki w postach WordPress będą absolutne.
 
 ### Publikacja na WordPress przez GUI
 Wymagane zmienne w `.env` (per‑project lub globalnie):
+
 - `WORDPRESS_URL` — np. `https://twoj‑wordpress.pl`
 - `WORDPRESS_USERNAME`
 - `WORDPRESS_APP_PASSWORD` — Application Password użytkownika WP
@@ -144,7 +153,20 @@ GUI umieszcza miniaturę w Media Library i tworzy post z treścią z `descriptio
 ### Integracja z Nextcloud (WebDAV)
 W GUI podaj ścieżkę zdalną (np. `/YT/content/materiał.md`) i kliknij „Fetch to content/episodes/”.
 Zmienne w `.env` (per‑project lub globalnie):
+
 - `NEXTCLOUD_URL`, `NEXTCLOUD_USERNAME`, `NEXTCLOUD_PASSWORD`
+
+### Kontrola Detekcji Ciszy
+Możesz dostosować, jak YTLite wykrywa ciszę w plikach audio, używając następujących zmiennych środowiskowych:
+
+- `MEDIA_SILENCE_DB`: Próg głośności w dB, poniżej którego dźwięk jest uznawany za ciszę (domyślnie: `-50.0`).
+- `MEDIA_SILENCE_MIN_MS`: Minimalna długość ciągłej ciszy w milisekundach, aby uznać ją za problematyczną (domyślnie: `800`).
+- `MEDIA_SILENCE_FRACTION`: Jaka część całego pliku musi być cicha, aby uznać go za całkowicie cichy (domyślnie: `0.8`, czyli 80%).
+
+Przykład bardziej tolerancyjnego uruchomienia:
+```bash
+MEDIA_SILENCE_MIN_MS=1200 MEDIA_SILENCE_FRACTION=0.9 make gui-normal
+```
 
 ### Upload na YouTube — per projekt i per konto
 - Cel Makefile: `make upload-project PROJECT=<nazwa> [PRIVACY=public|unlisted|private]`
@@ -192,31 +214,39 @@ Docker to zalecany sposób uruchamiania projektu. Eliminuje problemy z zależno�
 
 ### Główna Aplikacja (Generowanie Wideo)
 
-1.  **Zbuduj obrazy** (tylko za pierwszym razem lub po zmianie zależności):
-    ```bash
-    make docker-build
-    ```
+1. **Zbuduj obrazy** (tylko za pierwszym razem lub po zmianie zależności):
 
-2.  **Uruchom usługi** (aplikacja i serwer podglądu):
-    ```bash
-    make docker-up
-    ```
+```bash
+make docker-build
+```
 
-3.  **Otwórz powłokę w kontenerze**, aby pracować z `make`:
-    ```bash
-    make docker-shell
-    ```
-    Wewnątrz kontenera możesz używać poleceń, tak jak lokalnie:
-    ```bash
-    # Będąc wewnątrz kontenera:
-    make generate
-    make upload
-    ```
+2. **Uruchom usługi** (aplikacja i serwer podglądu):
 
-4.  **Zatrzymaj usługi**:
-    ```bash
-    make docker-down
-    ```
+```bash
+make docker-up
+```
+
+3. **Otwórz powłokę w kontenerze**, aby pracować z `make`:
+
+```bash
+make docker-shell
+```
+
+    
+Wewnątrz kontenera możesz używać poleceń, tak jak lokalnie:
+
+```bash
+# Będąc wewnątrz kontenera:
+make generate
+make upload
+```
+
+4. **Zatrzymaj usługi**:
+
+```bash
+make docker-down
+```
+
 
 ### Web GUI w Docker Compose
 
@@ -235,46 +265,54 @@ open http://localhost:5000
 
 ### Aplikacja Tauri (OAuth Helper)
 
-1.  **Uruchom kontener deweloperski**:
-    ```bash
-    make tauri-dev
-    ```
+1. **Uruchom kontener deweloperski**:
 
-2.  **Otwórz powłokę w kontenerze Tauri**:
-    ```bash
-    make tauri-shell
-    ```
+```bash
+make tauri-dev
+```
 
-3.  **Uruchom testy**:
-    ```bash
-    make tauri-test
-    ```
+2. **Otwórz powłokę w kontenerze Tauri**:
+
+```bash
+make tauri-shell
+```
+
+3. **Uruchom testy**:
+
+```bash
+make tauri-test
+```
+
 
 ## Konfiguracja
 
-### 🔑 Pliki konfiguracyjne:
+
+### 🔑 Pliki konfiguracyjne
+
 - [`.env.example`](.env.example) - zmienne środowiskowe (API keys, ustawienia)
 - [`config.yaml`](config.yaml) - główna konfiguracja (głosy, motywy, jakość)
 - [`Makefile`](Makefile) - komendy automatyzacji
 
-### 1. **YouTube API:**
-   - Idź do [Google Cloud Console](https://console.cloud.google.com/)
-   - Włącz YouTube Data API v3
-   - Pobierz `credentials.json` → `credentials/`
+### 1. **YouTube API**
+- Idź do [Google Cloud Console](https://console.cloud.google.com/)
+- Włącz YouTube Data API v3
+- Pobierz `credentials.json` → `credentials/`
 
-### 2. **Środowisko:**
-   ```bash
-   cp .env.example .env
-   # Wypełnij swoje dane
-   ```
+### 2. **Środowisko**
 
-### 3. **Głosy TTS:**
-   ```yaml
-   # config.yaml
-   voice: pl-PL-MarekNeural  # Mężczyzna PL
-   # voice: pl-PL-ZofiaNeural  # Kobieta PL
-   # voice: en-US-AriaNeural   # Kobieta EN
+```bash
+cp .env.example .env
+# Wypełnij swoje dane
 ```
+### 3. **Głosy TTS**
+
+```yaml
+# config.yaml
+voice: pl-PL-MarekNeural  # Mężczyzna PL
+# voice: pl-PL-ZofiaNeural  # Kobieta PL
+# voice: en-US-AriaNeural   # Kobieta EN
+```
+
 
 ## Motywy
 
@@ -333,19 +371,21 @@ Skup się na **pomysłach**, nie na produkcji. Niech roboty zajmują się reszt�
 ## Przykłady użycia
 
 ### Quick content z stdin
+
 ```bash
 echo "Dziś myślę o AI..." | make quick
 ```
-
 ### Batch processing
+
 ```bash
 make generate  # Wszystkie pliki z content/episodes/
 ```
-
 ### Watch mode
+
 ```bash
 make dev-watch  # Auto-generuj przy zmianie plików
 ```
+
 
 ## Wymagania
 
@@ -356,11 +396,12 @@ make dev-watch  # Auto-generuj przy zmianie plików
 ## Instalacja
 
 ### Automatyczna
+
 ```bash
 curl -sSL https://raw.githubusercontent.com/tom-sapletta-com/ytlite/main/install.sh | bash
 ```
-
 ### Manualna
+
 ```bash
 git clone https://github.com/tom-sapletta-com/ytlite
 cd ytlite
@@ -368,11 +409,11 @@ pip install -r requirements.txt
 make install
 ```
 
+
 ## Wsparcie
 
 - GitHub Issues: [github.com/tom-sapletta-com/ytlite](https://github.com/tom-sapletta-com/ytlite)
 - Blog: [wetware.dev](https://wetware.dev)
 
 ---
-
-*YTLite - Bo życie jest za krótkie na ręczny montaż* 
+*YTLite - Bo życie jest za krótkie na ręczny montaż*
