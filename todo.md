@@ -100,3 +100,40 @@ po wykonaniu filmu stworz miniaturke
 
 - [x] **Investigate and resolve MQTT connection errors:** Disabled MQTT publishing by commenting out `publish_mqtt_event` calls in `src/web_gui/helpers.py` to prevent connection warnings.
 - [x] **Consolidate metadata endpoints:** Removed the redundant `/api/svg_meta` endpoint and updated the frontend to use `/api/svg_metadata` for all project metadata requests, improving code consistency.
+
+
+- Sprawdz główne pliki w projekcie, aby zidentyfikować te wymagające refaktoryzacji
+- te ktore maja wiecej niz 500 linii kodu podziel na mneijsze
+- te ktore sa stare, nieuzywane usun
+
+
+ python3 sumline.py 
+All files sorted by line count:
+1617 lines: ./build/lib/src/web_gui.py
+1286 lines: ./src/web_gui/javascript.py
+1128 lines: ./web_static/static/js/web_gui.js
+ 652 lines: ./src/validator.py
+ 632 lines: ./build/lib/src/validator.py
+ 626 lines: ./build/lib/src/web_gui/javascript.py
+ 566 lines: ./build/lib/src/web_gui/templates.py
+ 556 lines: ./build/lib/src/web_gui/routes.py
+ 497 lines: ./src/video_generator.py
+ 475 lines: ./src/ytlite.py
+ 475 lines: ./build/lib/src/ytlite.py
+ 466 lines: ./src/ytlite_main.py
+ 435 lines: ./minimal_validation_test.py
+ 429 lines: ./tests_quarantine/test_web_gui_e2e.py
+ 407 lines: ./build/lib/src/ytlite_main.py
+ 406 lines: ./src/svg_packager.py
+ 392 lines: ./scripts/test-data.sh
+ 388 lines: ./tauri-youtube-oauth/src/youtube_uploader.py
+ 388 lines: ./src/youtube_uploader.py
+ 388 lines: ./build/lib/src/youtube_uploader.py
+
+Files with more than 600 lines:
+1617 lines: ./build/lib/src/web_gui.py
+1286 lines: ./src/web_gui/javascript.py
+1128 lines: ./web_static/static/js/web_gui.js
+ 652 lines: ./src/validator.py
+ 632 lines: ./build/lib/src/validator.py
+ 626 lines: ./build/lib/src/web_gui/javascript.py

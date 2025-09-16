@@ -82,7 +82,18 @@ def run_ytlite_generation(project_name: str, markdown_content: str, force_regene
 
     config_overrides = config_overrides or {}
     if 'font_size' in config_overrides:
-        config_overrides['font_size'] = int(config_overrides['font_size'])
+        font_size = config_overrides['font_size']
+        # Handle string font sizes by mapping them to numeric values
+        if isinstance(font_size, str):
+            font_size_map = {
+                'small': 24,
+                'medium': 48, 
+                'large': 72,
+                'xl': 96
+            }
+            config_overrides['font_size'] = font_size_map.get(font_size, 48)  # default to medium
+        else:
+            config_overrides['font_size'] = int(font_size)
     ytlite_instance = YTLite(config_overrides=config_overrides)
     return ytlite_instance.run_from_content(markdown_content, project_name, force_regenerate)
 
