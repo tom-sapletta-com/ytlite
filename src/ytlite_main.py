@@ -398,6 +398,27 @@ def generate(markdown_file):
     ytlite.generate_video(markdown_file)
 
 @cli.command()
+@click.option('--project', help='Project name to generate video for')
+def generate_project(project):
+    """Generate video for a specific project"""
+    if not project:
+        console.print("[red]Error: --project option is required[/]")
+        sys.exit(1)
+    
+    verify_dependencies()
+    ytlite = YTLite(project_name=project)
+    project_dir = ytlite.output_dir / "projects" / project
+    console.print(f"[cyan]Looking for markdown file in {project_dir}[/]")
+    markdown_file = project_dir / "description.md"
+    if not markdown_file.exists():
+        markdown_file = project_dir / f"{project}.md"
+    if not markdown_file.exists():
+        console.print(f"[red]Error: Markdown file for project {project} not found in {project_dir}[/]")
+        sys.exit(1)
+    console.print(f"[cyan]Found markdown file: {markdown_file}[/]")
+    ytlite.generate_video(str(markdown_file))
+
+@cli.command()
 def check():
     """Check and install dependencies"""
     verify_dependencies()

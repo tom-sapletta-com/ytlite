@@ -53,20 +53,20 @@ def generate_missing_media(project_name: str, output_dir: Path) -> tuple[bool, l
         try:
             ares = check_audio_silence(audio_path)
             vres = check_video_audio_silence(video_path)
-            publish_mqtt_event(
-                'postgen_audio_silence' if ares.get('silent') else 'postgen_audio_ok',
-                'error' if ares.get('silent') else 'info',
-                project_name,
-                {'check': ares},
-                tags=['postgen', 'media']
-            )
-            publish_mqtt_event(
-                'postgen_video_silence' if (vres.get('silent') or not vres.get('has_audio')) else 'postgen_video_ok',
-                'error' if (vres.get('silent') or not vres.get('has_audio')) else 'info',
-                project_name,
-                {'check': vres},
-                tags=['postgen', 'media']
-            )
+            # publish_mqtt_event(
+            #     'postgen_audio_silence' if ares.get('silent') else 'postgen_audio_ok',
+            #     'error' if ares.get('silent') else 'info',
+            #     project_name,
+            #     {'check': ares},
+            #     tags=['postgen', 'media']
+            # )
+            # publish_mqtt_event(
+            #     'postgen_video_silence' if (vres.get('silent') or not vres.get('has_audio')) else 'postgen_video_ok',
+            #     'error' if (vres.get('silent') or not vres.get('has_audio')) else 'info',
+            #     project_name,
+            #     {'check': vres},
+            #     tags=['postgen', 'media']
+            # )
         except Exception as _e:
             logger.warning(f"Media validation publish failed for {project_name}: {_e}")
 
@@ -80,7 +80,10 @@ def run_ytlite_generation(project_name: str, markdown_content: str, force_regene
     """Run YTLite generation process."""
     from ytlite_main import YTLite
 
-    ytlite_instance = YTLite(config_overrides=config_overrides or {})
+    config_overrides = config_overrides or {}
+    if 'font_size' in config_overrides:
+        config_overrides['font_size'] = int(config_overrides['font_size'])
+    ytlite_instance = YTLite(config_overrides=config_overrides)
     return ytlite_instance.run_from_content(markdown_content, project_name, force_regenerate)
 
 def create_svg_project(project_name: str, content: str, metadata: Dict[str, Any] = None,
@@ -142,20 +145,20 @@ def create_svg_project(project_name: str, content: str, metadata: Dict[str, Any]
         try:
             ares = check_audio_silence(audio_path)
             vres = check_video_audio_silence(video_path)
-            publish_mqtt_event(
-                'postgen_audio_silence' if ares.get('silent') else 'postgen_audio_ok',
-                'error' if ares.get('silent') else 'info',
-                project_name,
-                {'check': ares},
-                tags=['postgen', 'media']
-            )
-            publish_mqtt_event(
-                'postgen_video_silence' if (vres.get('silent') or not vres.get('has_audio')) else 'postgen_video_ok',
-                'error' if (vres.get('silent') or not vres.get('has_audio')) else 'info',
-                project_name,
-                {'check': vres},
-                tags=['postgen', 'media']
-            )
+            # publish_mqtt_event(
+            #     'postgen_audio_silence' if ares.get('silent') else 'postgen_audio_ok',
+            #     'error' if ares.get('silent') else 'info',
+            #     project_name,
+            #     {'check': ares},
+            #     tags=['postgen', 'media']
+            # )
+            # publish_mqtt_event(
+            #     'postgen_video_silence' if (vres.get('silent') or not vres.get('has_audio')) else 'postgen_video_ok',
+            #     'error' if (vres.get('silent') or not vres.get('has_audio')) else 'info',
+            #     project_name,
+            #     {'check': vres},
+            #     tags=['postgen', 'media']
+            # )
         except Exception as _e:
             logger.warning(f"Media validation failed for {project_name}: {_e}")
 

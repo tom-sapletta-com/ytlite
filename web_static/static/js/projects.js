@@ -28,10 +28,11 @@ function selectProject(name) {
 
 async function loadProjectMetadata(projectName) {
   try {
-    const res = await fetch(`/api/svg_meta?project=${projectName}`);
+    const res = await fetch(`/api/svg_metadata?project=${projectName}`);
     if (!res.ok) return;
 
-    const meta = await res.json();
+    const data = await res.json();
+    const meta = data.metadata || {};
     if (!meta) return;
 
     const metaContainer = document.getElementById(`project-meta-${projectName}`);

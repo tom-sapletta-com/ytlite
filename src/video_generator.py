@@ -105,7 +105,7 @@ class VideoGenerator:
             draw.line([(0, y), (w, y)], fill=(r, g, b))
 
     def create_slide(self, text: str, theme: str = "tech", lang: str | None = None,
-                     template: str = "classic", font_size: int | None = None,
+                     template: str = "classic", font_size: int | str | None = None,
                      colors: dict | None = None) -> str:
         """Create a slide image from text with optional template and language-aware font."""
         # Get theme colors
@@ -129,7 +129,15 @@ class VideoGenerator:
                 pass
 
         # Font
-        fsize = int(font_size or self.font_size)
+        if isinstance(font_size, str):
+            font_size_map = {
+                'small': 24,
+                'medium': 48,
+                'large': 72
+            }
+            fsize = font_size_map.get(font_size.lower(), self.font_size)
+        else:
+            fsize = int(font_size or self.font_size)
         font = self._pick_font(lang, fsize)
 
         # Multi-line support (split on \n)

@@ -2,7 +2,6 @@
 """
 Project listing and metadata routes extracted from routes.py
 - /api/projects
-- /api/svg_meta
 - /api/svg_metadata
 - /api/delete_project
 """
@@ -42,22 +41,6 @@ def register_project_routes(app, output_dir: Path, logger) -> None:
         except Exception as e:
             logger.error(f"Error listing projects: {e}", exc_info=True)
             return jsonify({'message': str(e)}), 500
-
-    @app.route('/api/svg_meta', methods=['GET'])
-    def api_svg_meta():
-        project = request.args.get('project', '').strip()
-        if not project:
-            return jsonify({'error': 'Missing project parameter'}), 400
-        svg_file = output_dir / 'svg_projects' / f"{project}.svg"
-        if not svg_file.exists():
-            return jsonify({'error': 'Project not found'}), 404
-        try:
-            from svg_packager import parse_svg_meta
-            meta = parse_svg_meta(svg_file)
-            return jsonify(meta or {}), 200
-        except Exception as e:
-            logger.error(f"Failed to read SVG metadata for {project}: {e}")
-            return jsonify({'error': 'Failed to read SVG metadata'}), 500
 
     @app.route('/api/svg_metadata')
     def api_svg_metadata():

@@ -4,7 +4,7 @@ pozowl na tworzenie roznych proejtkow na ropzne konta youtube, gdzie
 dane wrazliwe sa przechopwywane w .env dla danego projektu w danym folderze
 
 
-generuj samodzielnie, nie pytaj o uruchmienie skrytpow i komend, pisz wlasne skrypyt uruchamiajc rozne uslugi, zamiast pytac usera, dodaj bardziej zlozone odpytywanie o bledy, stworz liste check z e skrytpami, aby zbadac co moze byc problemem automatycznie poorpzez generowanie logo zaawansowanych w formacie json w pliku dla llm
+generuj samodzielnie, nie pytaj o uruchmienie skrytpow i komend, pisz wlasne skryptyt uruchamiajc rozne uslugi, zamiast pytac usera, dodaj bardziej zlozone odpytywanie o bledy, stworz liste check z e skrytpami, aby zbadac co moze byc problemem automatycznie poorpzez generowanie logo zaawansowanych w formacie json w pliku dla llm
 
 
 
@@ -96,3 +96,7 @@ po wykonaniu filmu stworz miniaturke
 - dodaj tez do kazdego projektu mala miniaturke 64px
 
 
+## Completed by Cascade
+
+- [x] **Investigate and resolve MQTT connection errors:** Disabled MQTT publishing by commenting out `publish_mqtt_event` calls in `src/web_gui/helpers.py` to prevent connection warnings.
+- [x] **Consolidate metadata endpoints:** Removed the redundant `/api/svg_meta` endpoint and updated the frontend to use `/api/svg_metadata` for all project metadata requests, improving code consistency.
