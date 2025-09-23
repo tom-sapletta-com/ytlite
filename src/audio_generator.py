@@ -17,9 +17,14 @@ console = Console()
 logger = get_logger("audio")
 
 class AudioGenerator:
-    def __init__(self, config):
-        self.config = config
-        self.voice = config.get("voice", "pl-PL-MarekNeural")
+    def __init__(self, config=None):
+        self.config = config or {}
+        self.voice = self.config.get("voice", "pl-PL-MarekNeural")
+        
+    def set_voice(self, voice: str):
+        """Update the voice for audio generation"""
+        self.voice = voice
+        logger.info(f"Voice set to: {self.voice}")
         
     async def generate_audio_async(self, text: str, output_path: str):
         """Generate audio from text using edge-tts"""
@@ -32,10 +37,18 @@ class AudioGenerator:
         console.print(f"[green]✓ Audio saved: {output_path}[/]")
         logger.info("Audio saved", extra={"output": output_path})
         
-    def generate_audio(self, text: str, output_path: str):
+    def generate_audio(self, text: str, output_path: str, voice: str = None):
         """Synchronous wrapper for audio generation.
         If YTLITE_FAST_TEST=1, generate a 1s silent MP3 using bundled ffmpeg for fast E2E tests.
+        
+        Args:
+            text: The text to convert to speech
+            output_path: Path to save the generated audio
+            voice: Optional voice to use (overrides instance voice)
         """
+        # Use the provided voice if specified, otherwise use the instance voice
+        current_voice = voice or self.voice
+        self.voice = current_voice  # Update instance voice for future calls
         Path(output_path).parent.mkdir(parents=True, exist_ok=True)
         if os.getenv("YTLITE_FAST_TEST") == "1":
             try:

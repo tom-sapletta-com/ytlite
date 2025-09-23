@@ -14,6 +14,8 @@ from rich.console import Console
 from dotenv import load_dotenv
 from logging_setup import get_logger
 from progress import ProgressReporter
+from PIL import Image, ImageDraw, ImageFont
+from moviepy.editor import VideoFileClip
 
 # Import our modules
 from dependencies import verify_dependencies
@@ -356,21 +358,38 @@ class YTLite:
         logger.info("Output index written", extra={"path": str(self.output_dir / 'README.md'), "count": len(items)})
 
     def run_from_content(self, markdown_content: str, project_name: str, force_regenerate: bool = False):
-        """Generate video from markdown content string."""
+        """Generate video from markdown content string with intelligent regeneration."""
         project_dir = self.output_dir / "projects" / project_name
         project_dir.mkdir(parents=True, exist_ok=True)
         tmp_md_path = project_dir / f"{project_name}.md"
 
-        # If we don't force regenerate, and video exists, skip
+        # Check selective regeneration flags from config
+        regenerate_audio = self.config.get('regenerate_audio', force_regenerate)
+        regenerate_video = self.config.get('regenerate_video', force_regenerate) 
+        regenerate_slides = self.config.get('regenerate_slides', force_regenerate)
+
+        # File paths
+        audio_path = self.output_dir / "audio" / f"{project_name}.mp3"
         video_path = self.output_dir / "videos" / f"{project_name}.mp4"
-        if not force_regenerate and video_path.exists():
-            logger.info(f"Video for {project_name} already exists and force_regenerate is False. Skipping.")
-            return {"success": True, "message": "Video already exists.", "video_path": str(video_path)}
+        
+        # If no regeneration needed and video exists, skip
+        if not force_regenerate and not any([regenerate_audio, regenerate_video, regenerate_slides]) and video_path.exists():
+            logger.info(f"No changes detected for {project_name} - skipping regeneration")
+            return {"success": True, "message": "No changes detected.", "video_path": str(video_path)}
 
         try:
             tmp_md_path.write_text(markdown_content, encoding="utf-8")
             logger.info(f"Created temporary markdown file: {tmp_md_path}")
-            self.generate_video(str(tmp_md_path))
+            
+            # Selective generation based on what changed
+            if force_regenerate:
+                # Full regeneration
+                logger.info(f"Force regeneration enabled for {project_name}")
+                self.generate_video(str(tmp_md_path))
+            else:
+                # Selective regeneration
+                self._selective_generate_video(str(tmp_md_path), regenerate_audio, regenerate_video, regenerate_slides)
+            
             return {"success": True, "message": "Video generated successfully."}
         except Exception as e:
             logger.error(f"Failed to generate video from content for {project_name}: {e}", exc_info=True)
@@ -380,6 +399,135 @@ class YTLite:
             if tmp_md_path.exists():
                 # pass # Keep for debugging
                 tmp_md_path.unlink()
+
+    def _selective_generate_video(self, markdown_file: str, regenerate_audio: bool, regenerate_video: bool, regenerate_slides: bool):
+        """Generate video components selectively based on what changed."""
+        file_path = Path(markdown_file)
+        project_name = file_path.stem
+        
+        logger.info(f"Selective generation for {project_name}: audio={regenerate_audio}, video={regenerate_video}, slides={regenerate_slides}")
+        
+        # Parse content
+        content = self.content_parser.parse_markdown_content(file_path)
+        if not content:
+            raise ValueError(f"Could not parse content from {markdown_file}")
+
+        # Generate audio if needed
+        audio_path = None
+        if regenerate_audio:
+            logger.info(f"Regenerating audio for {project_name}")
+            # Extract text content from parsed result
+            text_content = "\n\n".join(content['paragraphs']) if content['paragraphs'] else ""
+            audio_path = self.audio_generator.generate_audio(text_content, project_name)
+            if not audio_path:
+                raise ValueError(f"Audio generation failed for {project_name}")
+        else:
+            # Use existing audio if available
+            existing_audio = self.output_dir / "audio" / f"{project_name}.mp3"
+            if existing_audio.exists():
+                audio_path = str(existing_audio)
+                logger.info(f"Using existing audio for {project_name}")
+
+        # Generate video if needed (requires slides regeneration or audio change)
+        if regenerate_video or regenerate_slides:
+            logger.info(f"Regenerating video for {project_name}")
+            if not audio_path:
+                raise ValueError(f"Cannot generate video without audio for {project_name}")
+            
+            # Create slides from content
+            slides_text = content['slides'] if content['slides'] else content['paragraphs']
+            slide_paths = []
+            
+            # Get theme and language from metadata
+            theme = content['metadata'].get('theme', 'tech')
+            lang = self.config.get('language', 'en')
+            
+            # Get subtitle settings from config
+            subtitle_settings = {
+                'include_subtitles': self.config.get('include_subtitles', False),
+                'subtitle_font': self.config.get('subtitle_font', 'Arial'),
+                'subtitle_font_size': int(self.config.get('subtitle_font_size', 36)),
+                'subtitle_color': self.config.get('subtitle_color', 'white'),
+                'subtitle_bg_color': self.config.get('subtitle_bg_color', 'black'),
+                'subtitle_bg_opacity': float(self.config.get('subtitle_bg_opacity', 0.5)),
+                'subtitle_position': self.config.get('subtitle_position', 'bottom'),
+                'subtitle_margin': int(self.config.get('subtitle_margin', 50))
+            }
+            
+            # Get font size from config or use default (48)
+            font_size = int(self.config.get('font_size', 48))
+            
+            # Create slide definitions with text and styling
+            slides = []
+            for i, text in enumerate(slides_text):
+                # Create a slide definition with text and styling
+                slide_def = {
+                    'text': text,
+                    'theme': theme,
+                    'lang': lang,
+                    'font_size': font_size,  # Use the configured font size
+                    **subtitle_settings  # Include all subtitle settings
+                }
+                
+                # Generate the slide image and get its path
+                slide_path = self.video_generator.slide_generator.create_slide(**slide_def)
+                slide_paths.append(slide_path)
+                
+                # Add the slide definition to the slides list for video generation
+                slides.append(slide_def)
+            
+            # Create video from slides
+            video_path = self.output_dir / "videos" / f"{project_name}.mp4"
+            video_path.parent.mkdir(exist_ok=True)
+            
+            # Use the create_video method with the first slide's settings for subtitles
+            self.video_generator.create_video(
+                output_path=str(video_path),
+                slides=slides,  # Pass the slide definitions directly
+                audio_path=str(audio_path) if audio_path else None,
+                include_subtitles=subtitle_settings['include_subtitles'],
+                subtitle_font=subtitle_settings['subtitle_font'],
+                subtitle_font_size=subtitle_settings['subtitle_font_size'],
+                subtitle_color=subtitle_settings['subtitle_color'],
+                subtitle_bg_color=subtitle_settings['subtitle_bg_color'],
+                subtitle_bg_opacity=subtitle_settings['subtitle_bg_opacity'],
+                subtitle_position=subtitle_settings['subtitle_position'],
+                subtitle_margin=subtitle_settings['subtitle_margin']
+            )
+            
+            if not video_path.exists():
+                raise ValueError(f"Video generation failed for {project_name}")
+                
+            # Regenerate thumbnail after video update
+            try:
+                from PIL import Image, ImageDraw, ImageFont
+                from moviepy.editor import VideoFileClip
+                video = VideoFileClip(str(video_path))
+                frame = video.get_frame(video.duration / 3)
+                img = Image.fromarray(frame.astype('uint8'))
+                
+                # Create thumbnail directory if it doesn't exist
+                thumb_dir = self.output_dir / "thumbnails"
+                thumb_dir.mkdir(exist_ok=True)
+                
+                # Save thumbnail
+                thumb_path = thumb_dir / f"{project_name}.jpg"
+                img.save(thumb_path, quality=95)
+                logger.info(f"Generated new thumbnail at {thumb_path}")
+                
+                # Update the SVG package if it exists
+                svg_path = self.output_dir / "svg_projects" / f"{project_name}.svg"
+                if svg_path.exists():
+                    from svg_packager import update_svg_media
+                    update_svg_media(svg_path, video_path=video_path, thumb_path=thumb_path)
+                    logger.info(f"Updated SVG package with new thumbnail at {svg_path}")
+                    
+            except Exception as e:
+                logger.error(f"Error generating thumbnail: {e}")
+        else:
+            logger.info(f"Video unchanged for {project_name}")
+
+        logger.info(f"Selective generation completed for {project_name}")
 
 @click.group()
 def cli():

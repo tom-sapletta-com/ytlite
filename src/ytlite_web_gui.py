@@ -23,10 +23,16 @@ from web_gui.routes import *
 
 def create_production_app():
     """Create the production-ready Flask application."""
-    app = Flask(__name__)
-    
-    # Define paths
+    # Define paths first
     base_dir = Path(__file__).resolve().parent.parent
+    template_dir = base_dir / 'templates'
+    static_dir = base_dir / 'web_static'
+    
+    # Create Flask app with correct template and static directories
+    app = Flask(__name__, 
+                template_folder=str(template_dir),
+                static_folder=str(static_dir))
+    
     output_dir = base_dir / 'output'
     
     # Ensure all required directories exist

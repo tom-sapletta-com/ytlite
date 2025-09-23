@@ -28,12 +28,24 @@ def create_app(config_overrides=None):
 
     base_dir = project_root
     output_dir = base_dir / 'output'
+    
+    # Create all required subdirectories
     output_dir.mkdir(exist_ok=True)
+    (output_dir / 'videos').mkdir(exist_ok=True)
+    (output_dir / 'audio').mkdir(exist_ok=True)
+    (output_dir / 'thumbnails').mkdir(exist_ok=True)
+    (output_dir / 'projects').mkdir(exist_ok=True)
+    (output_dir / 'svg_projects').mkdir(exist_ok=True)
 
     # In testing, we might want to use a different output dir
     if app.config['TESTING']:
         test_output_dir = base_dir / 'tests' / 'output'
         test_output_dir.mkdir(exist_ok=True)
+        (test_output_dir / 'videos').mkdir(exist_ok=True)
+        (test_output_dir / 'audio').mkdir(exist_ok=True)
+        (test_output_dir / 'thumbnails').mkdir(exist_ok=True)
+        (test_output_dir / 'projects').mkdir(exist_ok=True)
+        (test_output_dir / 'svg_projects').mkdir(exist_ok=True)
         output_dir = test_output_dir
 
     # Setup routes

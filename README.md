@@ -7,10 +7,25 @@
 
 Stwórz filmy YouTube z markdown w 30 sekund. Automatyzacja, która nie przeszkadza w kreatywności.
 
+## System Requirements
+
+- Python 3.8+
+- FFmpeg (required for video processing)
+  ```bash
+  # Ubuntu/Debian
+  sudo apt-get update && sudo apt-get install -y ffmpeg
+  
+  # macOS (using Homebrew)
+  brew install ffmpeg
+  
+  # Windows (using Chocolatey)
+  choco install ffmpeg
+  ```
+
 ## Quick Start
 
 ```bash
-# 1. Sklonuj i zainstaluj
+# 1. Clone and install
 git clone https://github.com/tom-sapletta-com/ytlite
 cd ytlite
 make install

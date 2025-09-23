@@ -76,7 +76,7 @@ async function updateMediaPreview(projectName) {
 
   const items = [
     { key: 'thumb', label: 'Thumbnail', url: `/files/thumbnails/${projectName}.jpg` },
-    { key: 'video', label: 'Video', url: `/files/videos/${projectName}.mp4` },
+    { key: 'video', label: 'Video', url: `/files/videos/${projectName}.mp4?t=${Date.now()}` },
     { key: 'audio', label: 'Audio', url: `/files/audio/${projectName}.mp3` },
     { key: 'svg', label: 'SVG', url: `/files/svg_projects/${projectName}.svg` },
   ];
@@ -294,6 +294,67 @@ function ensureSelectValue(selectId, value) {
 }
 
 // Form management
+function validateAndConvertFontSize(value) {
+  if (value === null || value === undefined || value === '') {
+    console.log('Font size not provided, using default (36)');
+    return 36;
+  }
+
+  // Map of named sizes to numeric values
+  const sizeMap = {
+    'xxs': 12, 'xs': 16, 'small': 24, 'medium': 36,
+    'large': 48, 'xl': 64, 'x-large': 64, 'xxl': 72, 'xxxl': 96,
+    'extra small': 16, 'extra-large': 72, 'huge': 96, 'giant': 120
+  };
+
+  // Convert to string and clean up
+  const strValue = String(value).trim().toLowerCase();
+  console.log(`Processing font size: '${value}' -> '${strValue}'`);
+
+  // Check for named sizes first
+  if (strValue in sizeMap) {
+    const size = sizeMap[strValue];
+    console.log(`Mapped named size '${strValue}' to: ${size}`);
+    return size;
+  }
+
+  // Handle numeric values
+  const numValue = parseFloat(strValue);
+  if (!isNaN(numValue)) {
+    const size = Math.min(Math.max(Math.round(numValue), 12), 120);
+    console.log(`Using numeric font size: ${size}`);
+    return size;
+  }
+
+  console.warn(`Invalid font size: '${value}', using default (36)`);
+  return 36; // Default fallback
+}
+
+function submitGenerateForm() {
+  const form = document.getElementById('generateForm');
+  const formData = new FormData(form);
+  
+  // Validate and convert font size
+  const fontSizeInput = form.querySelector('[name="font_size"]');
+  if (fontSizeInput) {
+    const fontSize = validateAndConvertFontSize(fontSizeInput.value);
+    formData.set('font_size', fontSize.toString());
+    fontSizeInput.value = fontSize; // Update the input with validated value
+    console.log(`Validated font size: ${fontSizeInput.value} -> ${fontSize}`);
+  }
+  form.scrollIntoView({behavior: 'smooth'});
+  if (!formHandlersAttached) {
+    const contentEl = document.getElementById('content');
+    contentEl.addEventListener('input', () => {
+      const proj = document.getElementById('project').value.trim();
+      if (proj) {
+        localStorage.setItem(`ytlite:content:${proj}`, contentEl.value);
+      }
+    });
+    formHandlersAttached = true;
+  }
+}
+
 function showProjectForm() {
   const form = document.getElementById('projectForm');
   form.style.display = 'block';
@@ -640,6 +701,9 @@ async function generateProject() {
   const template = document.getElementById('template').value;
   const font_size = document.getElementById('font_size').value;
   
+  // Subtitle options
+  const includeSubtitles = document.getElementById('includeSubtitles')?.checked || false;
+  
   // Clear previous errors
   showValidationErrors([]);
   
@@ -657,8 +721,30 @@ async function generateProject() {
   formData.append('template', template);
   if (font_size) formData.append('font_size', font_size);
   
-  showMessage('🚀 Generating project...', 'info');
-  logEvent(`Generate start for ${project}`, 'info');
+  // Add subtitle options
+  formData.append('include_subtitles', includeSubtitles);
+  
+  if (includeSubtitles) {
+    // Get all subtitle options
+    const subtitleFont = document.getElementById('subtitleFont')?.value || 'Arial';
+    const subtitleFontSize = document.getElementById('subtitleFontSize')?.value || '24';
+    const subtitleColor = document.getElementById('subtitleColor')?.value || '#ffffff';
+    const subtitleBgColor = document.getElementById('subtitleBgColor')?.value || '#000000';
+    const subtitleBgOpacity = document.getElementById('subtitleBgOpacity')?.value || '0.5';
+    const subtitlePosition = document.getElementById('subtitlePosition')?.value || 'bottom';
+    const subtitleMargin = document.getElementById('subtitleMargin')?.value || '50';
+    
+    formData.append('subtitle_font', subtitleFont);
+    formData.append('subtitle_font_size', subtitleFontSize);
+    formData.append('subtitle_color', subtitleColor);
+    formData.append('subtitle_bg_color', subtitleBgColor);
+    formData.append('subtitle_bg_opacity', subtitleBgOpacity);
+    formData.append('subtitle_position', subtitlePosition);
+    formData.append('subtitle_margin', subtitleMargin);
+  }
+  
+  showMessage('🚀 Generating project with ' + (includeSubtitles ? 'subtitles' : 'no subtitles') + '...', 'info');
+  logEvent(`Generate start for ${project} with ${includeSubtitles ? 'subtitles' : 'no subtitles'}`, 'info');
   
   try {
     const res = await fetch('/api/generate', { method: 'POST', body: formData });

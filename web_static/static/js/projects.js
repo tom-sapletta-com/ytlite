@@ -79,7 +79,17 @@ async function updateMediaPreview(projectName) {
     if (it.key === 'thumb') {
       blocks.push(`<div class="media-item"><h4>🖼️ ${it.label}</h4><img class="thumb" src="${it.url}" alt="thumbnail"></div>`);
     } else if (it.key === 'video') {
-      blocks.push(`<div class="media-item"><h4>🎬 ${it.label}</h4><video id="video-${projectName}" class="thumb" src="${it.url}" controls></video></div>`);
+      blocks.push(`
+        <div class="media-item">
+          <h4>🎬 ${it.label}</h4>
+          <video id="video-${projectName}" class="thumb" controls>
+            <source src="${it.url}" type="video/mp4">
+            Your browser does not support the video tag.
+          </video>
+          <div id="video-debug-${projectName}" style="font-size: 12px; color: #666; margin-top: 5px;"></div>
+          <button onclick="testVideoPlayback('${projectName}', '${it.url}')" class="btn btn-sm btn-secondary" style="margin-top: 5px;">Test Playback</button>
+        </div>
+      `);
     } else if (it.key === 'audio') {
       blocks.push(`<div class="media-item"><h4>🔊 ${it.label}</h4><audio id="audio-${projectName}" src="${it.url}" controls></audio></div>`);
     } else if (it.key === 'svg') {
@@ -139,6 +149,72 @@ async function prePlaybackCheck(projectName, mediaEl, kind) {
   } catch (e) {
     showMessage(`❌ Media check error: ${e.message}`, 'error');
   }
+}
+
+function testVideoPlayback(projectName, videoUrl) {
+  const debugEl = document.getElementById(`video-debug-${projectName}`);
+  if (!debugEl) return;
+  
+  debugEl.innerHTML = 'Testing video playback...';
+  
+  // Create a new video element for testing
+  const testVideo = document.createElement('video');
+  testVideo.controls = true;
+  testVideo.style.width = '100%';
+  
+  // Set up event listeners to track what's happening
+  testVideo.addEventListener('error', (e) => {
+    let message = 'Video error: ';
+    switch(testVideo.error.code) {
+      case MediaError.MEDIA_ERR_ABORTED:
+        message += 'Playback was aborted';
+        break;
+      case MediaError.MEDIA_ERR_NETWORK:
+        message += 'A network error occurred';
+        break;
+      case MediaError.MEDIA_ERR_DECODE:
+        message += 'The video could not be decoded';
+        break;
+      case MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED:
+        message += 'The video format is not supported';
+        break;
+      default:
+        message += 'Unknown error occurred';
+    }
+    debugEl.innerHTML += `<div style="color:red">❌ ${message}</div>`;
+    debugEl.innerHTML += `<div>Error details: ${JSON.stringify(testVideo.error, null, 2)}</div>`;
+  });
+  
+  testVideo.addEventListener('loadedmetadata', () => {
+    debugEl.innerHTML += `<div>✅ Video metadata loaded (${testVideo.videoWidth}x${testVideo.videoHeight}, ${testVideo.duration.toFixed(1)}s)</div>`;
+    testVideo.play().catch(e => {
+      debugEl.innerHTML += `<div style="color:orange">⚠️ Autoplay prevented: ${e.message}</div>`;
+      debugEl.innerHTML += '<div>Click the play button above to start playback</div>';
+    });
+  });
+  
+  testVideo.addEventListener('playing', () => {
+    debugEl.innerHTML += '<div style="color:green">▶️ Video is playing!</div>';
+  });
+  
+  // Replace the debug content with the test video
+  debugEl.innerHTML = '';
+  debugEl.appendChild(testVideo);
+  
+  // Set the video source
+  testVideo.src = videoUrl;
+  
+  // Add a button to close the test
+  const closeBtn = document.createElement('button');
+  closeBtn.className = 'btn btn-sm btn-secondary';
+  closeBtn.style.marginTop = '10px';
+  closeBtn.textContent = 'Close Test';
+  closeBtn.onclick = () => {
+    debugEl.innerHTML = 'Test completed. <a href="#" onclick="event.preventDefault(); testVideoPlayback(\'' + projectName + '\', \'' + videoUrl + '\')">Test again</a>';
+    testVideo.pause();
+    testVideo.src = '';
+  };
+  debugEl.appendChild(closeBtn);
 }
 
 async function checkMedia(projectName) {

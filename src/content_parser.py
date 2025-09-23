@@ -95,3 +95,16 @@ class ContentParser:
                 slides.append(paragraph)
         
         return slides
+    
+    def parse_markdown_content(self, file_path: str):
+        """Parse markdown content and return structured data for video generation"""
+        try:
+            metadata, paragraphs = self.parse_markdown(file_path)
+            return {
+                'metadata': metadata,
+                'paragraphs': paragraphs,
+                'slides': self.prepare_content_for_video(paragraphs)
+            }
+        except Exception as e:
+            logger.error(f"Failed to parse markdown content: {e}", extra={"file": file_path})
+            return None

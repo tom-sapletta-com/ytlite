@@ -79,6 +79,47 @@ def setup_routes(app: Flask, base_dir: Path, output_dir: Path):
                 load_dotenv(str(proj_env))
                 logger.info(f"Loaded per-project .env from {proj_env}")
 
+            # Process and validate font size
+            font_size = data.get('font_size', 'medium')
+            logger.info(f"🔠 Processing font size input: {font_size} (type: {type(font_size)})")
+            
+            try:
+                # Handle named font sizes (e.g., 'small', 'medium', 'large')
+                font_size_map = {
+                    'xxs': 12, 'xs': 16, 'small': 24, 'medium': 36,
+                    'large': 48, 'xl': 64, 'xxl': 72, 'xxxl': 96,
+                    'extra small': 16, 'extra large': 72, 'huge': 96, 'giant': 120
+                }
+                
+                if isinstance(font_size, str):
+                    clean_size = font_size.strip().lower()
+                    # Check for named sizes first
+                    if clean_size in font_size_map:
+                        font_size = font_size_map[clean_size]
+                        logger.info(f"Mapped named size '{font_size}' to: {font_size}")
+                    # Handle numeric strings
+                    elif clean_size.replace('.', '').isdigit():
+                        font_size = int(float(clean_size))
+                        logger.info(f"Converted string to font size: {font_size}")
+                    else:
+                        logger.warning(f"Unknown font size name: '{font_size}', using default (36)")
+                        font_size = 36
+                # Handle numeric types
+                elif isinstance(font_size, (int, float)):
+                    font_size = int(round(float(font_size)))
+                    logger.info(f"Using numeric font size: {font_size}")
+                else:
+                    logger.warning(f"Unexpected font size type: {type(font_size).__name__}, using default (36)")
+                    font_size = 36
+                    
+            except (ValueError, TypeError) as e:
+                logger.warning(f"Error processing font_size '{font_size}': {e}, using default (36)")
+                font_size = 36
+            
+            # Ensure font size is within reasonable bounds (12-120)
+            font_size = max(12, min(120, font_size))
+            logger.info(f"Final validated font size: {font_size}")
+
             # Prepare metadata for SVG project creation
             metadata = {
                 'project': project,
@@ -86,7 +127,7 @@ def setup_routes(app: Flask, base_dir: Path, output_dir: Path):
                 'voice': data.get('voice', 'en-US-AriaNeural'),
                 'theme': data.get('theme', 'default'),
                 'template': data.get('template', 'simple'),
-                'font_size': data.get('font_size', 'medium'),
+                'font_size': font_size,  # Use the processed font size
                 'language': data.get('lang', 'en'),
                 'created': datetime.now().isoformat()
             }
@@ -103,6 +144,27 @@ def setup_routes(app: Flask, base_dir: Path, output_dir: Path):
                 project_dir = output_dir / 'projects' / project
                 is_update = project_dir.exists()
 
+                # Get current project metadata if it's an update
+                old_metadata = {}
+                if is_update:
+                    try:
+                        from frontmatter import load
+                        md_file = project_dir / f"{project}.md"
+                        if not md_file.exists():
+                            md_file = project_dir / 'description.md'
+                        if md_file.exists():
+                            with open(md_file, 'r', encoding='utf-8') as f:
+                                old_post = load(f)
+                                old_metadata = {
+                                    'voice': old_post.get('voice'),
+                                    'theme': old_post.get('theme'),
+                                    'template': old_post.get('template'),
+                                    'font_size': old_post.get('font_size', old_post.get('fontSize')),
+                                    'lang': old_post.get('lang', old_post.get('language'))
+                                }
+                    except Exception as e:
+                        logger.warning(f"Could not load old project metadata for comparison: {e}")
+
                 # Collect all potential overrides from the form
                 config_overrides = {
                     'voice': data.get('voice'),
@@ -111,6 +173,22 @@ def setup_routes(app: Flask, base_dir: Path, output_dir: Path):
                     'font_size': data.get('font_size'),
                     'lang': data.get('lang')
                 }
+
+                # Log changes if this is an update
+                if is_update and old_metadata:
+                    changes = []
+                    for key in ['voice', 'theme', 'template', 'font_size', 'lang']:
+                        old_val = old_metadata.get(key)
+                        new_val = config_overrides.get(key)
+                        if old_val is not None and new_val is not None and str(old_val) != str(new_val):
+                            changes.append(f"{key}: '{old_val}' -> '{new_val}'"
+                                        f" (type: {type(old_val).__name__} -> {type(new_val).__name__})")
+                    
+                    if changes:
+                        logger.info(f"🔍 Project '{project}' changes detected:\n" + 
+                                 "\n".join(f"  - {change}" for change in changes))
+                    else:
+                        logger.info(f"ℹ️  Project '{project}' updated with no configuration changes")
                 # Filter out any empty values so we don't override with None
                 config_overrides = {k: v for k, v in config_overrides.items() if v}
 

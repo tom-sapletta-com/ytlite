@@ -1,4 +1,4 @@
-.PHONY: help install clean generate shorts upload upload-project publish docker-build docker-run preview daily test test-e2e gui logs logs-follow wordpress-test example-project
+.PHONY: help install clean generate shorts upload upload-project publish docker-build docker-run preview daily test test-e2e gui logs logs-follow wordpress-test example-project check-ffmpeg install-ffmpeg run-server debug
 
 # Colors for output
 GREEN := \033[0;32m
@@ -15,6 +15,36 @@ help: ## Show this help message
 	@echo ""
 	@echo "$(YELLOW)Usage:$(NC)"
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "  $(GREEN)%-20s$(NC) %s\n", $$1, $$2}'
+
+# ==============================================================================
+# SYSTEM CHECKS & SETUP
+# ==============================================================================
+check-ffmpeg: ## Check if FFmpeg is installed and working
+	@if ! command -v ffmpeg &> /dev/null; then \
+		echo "$(RED)❌ FFmpeg is not installed. Installing...$(NC)"; \
+		$(MAKE) install-ffmpeg; \
+	else \
+		echo "$(GREEN)✅ FFmpeg is installed$(NC)"; \
+		ffmpeg -version | head -n 1; \
+	fi
+
+install-ffmpeg: ## Install FFmpeg (required for video processing)
+	@echo "$(YELLOW)🔧 Installing FFmpeg...$(NC)"
+	@if [ -f /etc/debian_version ]; then \
+		sudo apt-get update && sudo apt-get install -y ffmpeg; \
+	elif [ "$$(uname)" = "Darwin" ]; then \
+		if ! command -v brew &> /dev/null; then \
+			echo "$(RED)❌ Homebrew is required to install FFmpeg on macOS$(NC)"; \
+			echo "Install Homebrew from https://brew.sh/"; \
+			exit 1; \
+		fi; \
+		brew install ffmpeg; \
+	else \
+		echo "$(YELLOW)⚠️  Unsupported OS. Please install FFmpeg manually.$(NC)"; \
+		echo "See: https://ffmpeg.org/download.html"; \
+		exit 1; \
+	fi
+	@echo "$(GREEN)✅ FFmpeg installed successfully$(NC)"
 
 # ==============================================================================
 # LOCAL WORKFLOW
@@ -87,6 +117,20 @@ tauri-test-contract: ## Run Tauri contract tests in Docker
 # ==============================================================================
 preview: ## Preview output locally on http://localhost:8080
 	bash scripts/preview.sh
+
+run-server: ## Start the development server with debug mode
+	@echo "$(YELLOW)🚀 Starting development server...$(NC)"
+	@FLASK_APP=src.ytlite_web_gui FLASK_DEBUG=1 python -m flask run --port=5000
+
+debug: ## Start the application in debug mode with detailed logging
+	@echo "$(YELLOW)🐛 Starting in debug mode...$(NC)"
+	@PYTHONPATH=./src python -m debugpy --listen 5678 --wait-for-client -m flask --app src.ytlite_web_gui run --debug
+
+logs: ## View application logs
+	@find logs -name "*.log" -type f -exec tail -n 50 {} \; 2>/dev/null || echo "No log files found in logs/"
+
+logs-follow: ## Follow application logs in real-time
+	@find logs -name "*.log" -type f -exec tail -f {} + 2>/dev/null || echo "No log files found in logs/"
 
 dev-watch: ## Watch for changes and auto-generate (local)
 	@bash scripts/dev-watch.sh
