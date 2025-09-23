@@ -5,6 +5,8 @@ reports/
 *.mp4
 *.m4a
 .env
+content
+test_output
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]
